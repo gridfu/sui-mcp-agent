@@ -1,0 +1,6 @@
+{
+	"root": true,
+	"title": "BCS",
+	"description": "Encoding and decoding Sui objects",
+	"pages": ["index"]
+}

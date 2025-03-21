@@ -1,0 +1,205 @@
+---
+title: Walrus SDK
+---
+
+## Installation
+
+```bash
+npm install --save @mysten/walrus @mysten/sui
+```
+
+## Setup
+
+To use the walrus SDK you will need to create an instance of the SuiClient from the typescript SDK,
+and an instance of the walrus SDK.
+
+```ts
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+
+import { WalrusClient } from '../src/index.js';
+
+const suiClient = new SuiClient({
+	url: getFullnodeUrl('testnet'),
+});
+
+const walrusClient = new WalrusClient({
+	network: 'testnet',
+	suiClient,
+});
+```
+
+The walrus SDK currently includes all the relevant package and object IDs needed for connecting to
+testnet. You can also manually configure the walrusClient to use a different set of ids, allowing
+you to connect to a different network or updated deployment of the walrus contracts.
+
+```ts
+const walrusClient = new WalrusClient({
+	suiClient,
+	packageConfig: {
+		packageId: '0x795ddbc26b8cfff2551f45e198b87fc19473f2df50f995376b924ac80e56f88b',
+		systemObjectId: '0x98ebc47370603fe81d9e15491b2f1443d619d1dab720d586e429ed233e1255c1',
+		stakingPoolId: '0x20266a17b4f1a216727f3eef5772f8d486a9e3b5e319af80a5b75809c035561d',
+		walPackageId: '0x8190b041122eb492bf63cb464476bd68c6b7e570a4079645a8b28732b6197a82',
+	},
+});
+```
+
+Walrus nodes currently use self-signed certificates. Until all nodes are updated to use valid
+certificates, you may need to configure your environment to ignore certificate errors.
+
+In node this can be done though an environment variable:
+
+```ts
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+```
+
+For some environments you may need to customize how data is fetched:
+
+```ts
+const walrusClient = new WalrusClient({
+	network: 'testnet',
+	suiClient,
+	storageNodeClientOptions: {
+		fetch: (url, options) => {
+			console.log('fetching', url);
+			return fetch(url, options);
+		},
+		timeout: 60_000,
+	},
+});
+```
+
+This can be used to implement a fetch function with custom timeouts, rate limits, retry logic, or
+any other desired behavior.
+
+## SDK Overview
+
+The walrus SDK is designed to be used to build aggregators and publishers, and is not intended to be
+used in clients directly in apps. Reading and writing blobs with the SDK requires complex
+encoding/decoding and many requests to the different storage nodes and interactions with the
+contracts on sui.
+
+The `WalrusClient` exposes high level methods for reading and writing blobs, as well as lower level
+methods for the individual steps in the process that can be used to implement more complex flows
+when you want more control to implement more optimized implementations.
+
+### Reading a blob
+
+The `readBlob` method will read a blob given the `blobId` and return `Uint8Array` containing the
+blobs content:
+
+```ts
+const blob = await walrusClient.readBlob({ blobId });
+```
+
+### Writing Blobs
+
+Thw `writeBlob` method can be used to write a blob (as a `Uint8Array`) to walrus. You will need to
+specify how long the blob should be stored for, and if the blob should be deletable.
+
+You will also need to provide a `signer` instance that signs and pays for the transaction/storage
+fees. The signer's address will need to have sufficient `SUI` to cover the transactions that
+register the blob, and certify its availability after it's been uploaded. It will also need to own
+sufficient `WAL` to pay to store the blob for the specified number of epochs, as well as the write
+fee for writing the blob.
+
+The exact costs will depend on the size of the blobs, as well as the current gas and storage prices.
+
+```ts
+const file = new TextEncoder().encode('Hello from the TS SDK!!!\n');
+
+const { blobId } = await walrusClient.writeBlob({
+	blob: file,
+	deletable: true,
+	epochs: 3,
+	signer: keypair,
+});
+```
+
+### Full API
+
+For a complete overview of the available methods on the `WalrusClient` you can reference type
+[TypeDocs](http://sdk.mystenlabs.com/typedoc/classes/_mysten_walrus.WalrusClient.html)
+
+### Examples
+
+There are a number of simple
+[examples you can reference](https://github.com/MystenLabs/ts-sdks/tree/main/packages/walrus/examples)
+in the `ts-sdks` repo that show things like building simple aggregators and publishers with the
+walrus SDK
+
+## Error handling
+
+The SDK exports all the error classes for different types of errors that can be thrown. Walrus is a
+fault tolerant distributed system, where many types of errors can be recovered from. During epoch
+changes there may be times when the data cahced in the `WalrusClient` can become invalid. Errors
+that result from this situation will extend the `RetryableWalrusClientError` class.
+
+You can check for these errors, and reset the client before retrying:
+
+```ts
+import { RetryableWalrusClientError } from '@mysten/walrus';
+
+if (error instanceof RetryableWalrusClientError) {
+	walrusClient.reset();
+
+	/* retry your operation */
+}
+```
+
+`RetryableWalrusClientError` are not guaranteed to succeed after resetting the client and retrying,
+but this pattern can be used to handle some edge cases.
+
+High level methods like `readBlob` already handle various error cases and will automatically retry
+when hitting these methods, as well as handling cases where only a subset of nodes need to respond
+successfully to read or publish a blob.
+
+When using the lower level methods to build your own read or publish flows, it is recommended to
+understand the number of shards/sliver that need to be successfully written or read for you
+operation to succeed, and gracefully handle cases where some nodes may be in a bad state.
+
+## Configuring network requests
+
+Reading and writing blobs directly from storage nodes requires a lot of requests. The walrus SDK
+will issue all requests needed to complete these operations, but does not handling all the
+complexities a robust aggregator or publisher might encounter.
+
+By default all requests are issued using the global `fetch` for whatever runtime the SDK is running
+in.
+
+This will not impose any limitations on concurrency, and will be subject to default timeouts and
+behavior defined by your runtime. To customize how requests are made, you can provide a custom
+`fetch` method:
+
+```ts
+import type { RequestInfo, RequestInit } from 'undici';
+import { Agent, fetch, setGlobalDispatcher } from 'undici';
+
+const walrusClient = new WalrusClient({
+	network: 'testnet',
+	suiClient,
+	storageNodeClientOptions: {
+		timeout: 60_000,
+		fetch: (url, init) => {
+			// Some casting may be required because undici types may not exactly match the @node/types types
+			return fetch(url as RequestInfo, {
+				...(init as RequestInit),
+				dispatcher: new Agent({
+					connectTimeout: 60_000,
+				}),
+			}) as unknown as Promise<Response>;
+		},
+	},
+});
+```
+
+### Known fetch limitations you might run into
+
+- Some nodes can be slow to respond. When running in node, the default connectTimeout is 10 seconds
+  and can cause request timeouts
+- In `bun` the `abort` signal will stop requests from responding, but they still wait for completion
+  before their promises reject
+
+```
+
+```

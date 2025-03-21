@@ -2,10 +2,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import { Transaction } from "@mysten/sui/transactions";
+import { bcs } from "@mysten/sui/bcs";
 import { z } from "zod";
 
 // Create server instance
-const server = new McpServer({
+export const server = new McpServer({
   name: "sui-tools",
   version: "1.0.0",
 });
@@ -56,6 +58,49 @@ server.tool("get-balance", "Get balance for a Sui address", {
           text: `Error getting balance: ${errorMessage}`
         }
       ]
+    };
+  }
+});
+
+server.tool("transfer-sui", "Transfer SUI tokens to another address", {
+  privateKey: z.string().min(1).describe("The private key of the sender's account"),
+  recipient: z.string().min(1).describe("The recipient's Sui address"),
+  amount: z.number().positive().describe("The amount of SUI to transfer (in SUI units, not MIST)"),
+  network: z.enum(['mainnet', 'testnet']).default('mainnet').describe("The network to execute the transfer on (mainnet or testnet)")
+}, async ({ privateKey, recipient, amount, network }) => {
+  try {
+    const client = network === 'mainnet' ? mainnetClient : testnetClient;
+    // Decode base64 and extract the raw 32-byte key
+    const keypair = Ed25519Keypair.fromSecretKey(privateKey);
+    const senderAddress = keypair.getPublicKey().toSuiAddress();
+    // compute amount
+    const amountInMist = amount * 1000000000;
+    const tx = new Transaction();
+    const [coin] = tx.splitCoins(tx.gas, [amountInMist]);
+
+    // transfer the split coin to a specific address
+    tx.transferObjects([coin], tx.pure.address(recipient));
+
+    // Sign and execute the transaction
+    const result = await client.signAndExecuteTransaction({
+      signer: keypair,
+      transaction: tx,
+    });
+    await client.waitForTransaction({ digest: result.digest });
+
+    return {
+      content: [{
+        type: "text",
+        text: `Successfully transferred ${amount} SUI from ${senderAddress} to ${recipient}\nTransaction: https://suiscan.xyz/testnet/tx/${result.digest}`
+      }]
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error transferring SUI: ${errorMessage}`
+      }]
     };
   }
 });

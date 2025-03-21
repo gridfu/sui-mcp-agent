@@ -1,0 +1,6 @@
+{
+	"root": true,
+	"title": "Walrus",
+	"description": "Publish and Read blobs directly from walrus storage nodes",
+	"pages": ["index"]
+}
