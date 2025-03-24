@@ -185,20 +185,98 @@ describe('GridTradingStrategy', () => {
     });
   });
 
-  describe('unimplemented features', () => {
-    it('should throw error for placeLimitOrders', async () => {
-      const strategy = new GridTradingStrategy(defaultConfig);
-      await expect(strategy.placeLimitOrders()).rejects.toThrow('DEX SDK integration not implemented yet');
+  describe('BTC/USDT grid trading scenario', () => {
+    const btcConfig = {
+      upperPrice: 52000,
+      lowerPrice: 48000,
+      gridCount: 4,
+      totalInvestment: 2000,
+      baseToken: '0x1234567890123456789012345678901234567890',
+      quoteToken: '0x0987654321098765432109876543210987654321'
+    };
+
+    const initialPosition = {
+      baseAmount: 0.01,  // Initial BTC
+      quoteAmount: 2000  // Initial USDT
+    };
+
+    it('should set up initial grid levels correctly', () => {
+      const strategy = new GridTradingStrategy(btcConfig, initialPosition, 50000);
+      const levels = strategy.getGridLevels();
+
+      expect(levels.length).toBe(5); // 4 grids = 5 price levels
+      expect(levels[0].price).toBe(48000);
+      expect(levels[4].price).toBe(52000);
+
+      // Verify grid spacing
+      const expectedStep = 1000; // (52000 - 48000) / 4
+      for (let i = 1; i < levels.length; i++) {
+        expect(levels[i].price - levels[i-1].price).toBe(expectedStep);
+      }
     });
 
-    it('should throw error for monitorAndUpdateOrders', async () => {
-      const strategy = new GridTradingStrategy(defaultConfig);
-      await expect(strategy.monitorAndUpdateOrders()).rejects.toThrow('Order monitoring not implemented yet');
+    it('should place initial orders correctly at 50000 USDT', async () => {
+      const strategy = new GridTradingStrategy(btcConfig, initialPosition, 50000);
+      await strategy.placeLimitOrders(50000);
+      const levels = strategy.getGridLevels();
+
+      // Verify buy orders below current price
+      expect(levels[1].buyOrder).toBeDefined();
+      expect(levels[1].buyOrder?.price).toBe(49000);
+      expect(levels[0].buyOrder).toBeDefined();
+      expect(levels[0].buyOrder?.price).toBe(48000);
+
+      // Verify sell orders above current price
+      expect(levels[3].sellOrder).toBeDefined();
+      expect(levels[3].sellOrder?.price).toBe(51000);
+      expect(levels[4].sellOrder).toBeDefined();
+      expect(levels[4].sellOrder?.price).toBe(52000);
     });
 
-    it('should throw error for calculatePnL', () => {
-      const strategy = new GridTradingStrategy(defaultConfig);
-      expect(() => strategy.calculatePnL()).toThrow('PnL calculation not implemented yet');
+    it('should handle price drop to 49000 USDT correctly', async () => {
+      const strategy = new GridTradingStrategy(btcConfig, initialPosition, 50000);
+      await strategy.placeLimitOrders(50000);
+      await strategy.monitorAndUpdateOrders(49000);
+
+      const position = strategy.getPosition();
+      expect(position.baseAmount).toBeCloseTo(0.02); // Initial 0.01 + bought 0.01
+      expect(position.quoteAmount).toBeCloseTo(1510); // 2000 - 490
+    });
+
+    it('should handle price recovery to 50000 USDT correctly', async () => {
+      const strategy = new GridTradingStrategy(btcConfig, {
+        baseAmount: 0.02,
+        quoteAmount: 1510
+      }, 49000);
+
+      await strategy.placeLimitOrders(49000);
+      await strategy.monitorAndUpdateOrders(50000);
+
+      const position = strategy.getPosition();
+      expect(position.baseAmount).toBeCloseTo(0.01); // 0.02 - 0.01 sold
+      expect(position.quoteAmount).toBeCloseTo(2010); // 1510 + 500
+      expect(strategy.calculatePnL()).toBeCloseTo(10); // Profit from 49000 -> 50000
+    });
+
+    it('should handle complete trading cycle with multiple price movements', async () => {
+      const strategy = new GridTradingStrategy(btcConfig, initialPosition, 50000);
+      await strategy.placeLimitOrders(50000);
+
+      // Price drops to 49000
+      await strategy.monitorAndUpdateOrders(49000);
+      // Price recovers to 50000
+      await strategy.monitorAndUpdateOrders(50000);
+      // Price rises to 51000
+      await strategy.monitorAndUpdateOrders(51000);
+      // Price drops to 50000
+      await strategy.monitorAndUpdateOrders(50000);
+      // Price rises back to 51000
+      await strategy.monitorAndUpdateOrders(51000);
+
+      const position = strategy.getPosition();
+      expect(position.quoteAmount).toBeCloseTo(2530);
+      expect(position.baseAmount).toBeCloseTo(0);
+      expect(strategy.calculatePnL()).toBeCloseTo(30); // Total profit from all trades
     });
   });
 });
