@@ -3,13 +3,26 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 // Grid Trading Configuration Schema
 const GridTradingConfig = z.object({
-  upperPrice: z.number().positive(),
-  lowerPrice: z.number().positive(),
-  gridCount: z.number().int().positive(),
-  totalInvestment: z.number().positive(),
-  baseToken: z.string(),
-  quoteToken: z.string(),
-});
+  upperPrice: z.number().positive()
+    .refine(val => val <= 1e9, 'Upper price must not exceed 1 billion'),
+  lowerPrice: z.number().positive()
+    .refine(val => val >= 1e-9, 'Lower price must be at least 0.000000001'),
+  gridCount: z.number().int().positive()
+    .min(2, 'Grid count must be at least 2')
+    .max(100, 'Grid count must not exceed 100'),
+  totalInvestment: z.number().positive()
+    .min(1, 'Total investment must be at least 1')
+    .max(1e9, 'Total investment must not exceed 1 billion'),
+  baseToken: z.string()
+    .min(1, 'Base token address cannot be empty')
+    .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid base token address format'),
+  quoteToken: z.string()
+    .min(1, 'Quote token address cannot be empty')
+    .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid quote token address format'),
+}).refine(
+  data => data.upperPrice > data.lowerPrice,
+  'Upper price must be greater than lower price'
+);
 
 type GridTradingConfig = z.infer<typeof GridTradingConfig>;
 

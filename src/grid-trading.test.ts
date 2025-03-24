@@ -1,4 +1,5 @@
-import { GridTradingStrategy } from './grid-trading.js';
+import { GridTradingStrategy, GridTradingConfig } from './grid-trading.js';
+import { z } from 'zod';
 
 describe('GridTradingStrategy', () => {
   const defaultConfig = {
@@ -6,9 +7,109 @@ describe('GridTradingStrategy', () => {
     lowerPrice: 50,
     gridCount: 5,
     totalInvestment: 1000,
-    baseToken: 'BTC',
-    quoteToken: 'USDT'
+    baseToken: '0x1234567890123456789012345678901234567890',
+    quoteToken: '0x0987654321098765432109876543210987654321'
   };
+
+  describe('GridTradingConfig validation', () => {
+    it('should accept valid configuration', () => {
+      expect(() => GridTradingConfig.parse(defaultConfig)).not.toThrow();
+    });
+
+    describe('price validations', () => {
+      it('should reject negative upper price', () => {
+        const invalidConfig = { ...defaultConfig, upperPrice: -100 };
+        expect(() => GridTradingConfig.parse(invalidConfig)).toThrow();
+      });
+
+      it('should reject upper price exceeding 1 billion', () => {
+        const invalidConfig = { ...defaultConfig, upperPrice: 2e9 };
+        expect(() => GridTradingConfig.parse(invalidConfig))
+          .toThrow('Upper price must not exceed 1 billion');
+      });
+
+      it('should reject negative lower price', () => {
+        const invalidConfig = { ...defaultConfig, lowerPrice: -50 };
+        expect(() => GridTradingConfig.parse(invalidConfig)).toThrow();
+      });
+
+      it('should reject lower price below minimum', () => {
+        const invalidConfig = { ...defaultConfig, lowerPrice: 1e-10 };
+        expect(() => GridTradingConfig.parse(invalidConfig))
+          .toThrow('Lower price must be at least 0.000000001');
+      });
+
+      it('should reject when upper price is not greater than lower price', () => {
+        const invalidConfig = { ...defaultConfig, upperPrice: 50, lowerPrice: 50 };
+        expect(() => GridTradingConfig.parse(invalidConfig))
+          .toThrow('Upper price must be greater than lower price');
+      });
+    });
+
+    describe('grid count validations', () => {
+      it('should reject non-integer grid count', () => {
+        const invalidConfig = { ...defaultConfig, gridCount: 3.5 };
+        expect(() => GridTradingConfig.parse(invalidConfig)).toThrow();
+      });
+
+      it('should reject grid count less than 2', () => {
+        const invalidConfig = { ...defaultConfig, gridCount: 1 };
+        expect(() => GridTradingConfig.parse(invalidConfig))
+          .toThrow('Grid count must be at least 2');
+      });
+
+      it('should reject grid count exceeding 100', () => {
+        const invalidConfig = { ...defaultConfig, gridCount: 101 };
+        expect(() => GridTradingConfig.parse(invalidConfig))
+          .toThrow('Grid count must not exceed 100');
+      });
+    });
+
+    describe('investment validations', () => {
+      it('should reject negative total investment', () => {
+        const invalidConfig = { ...defaultConfig, totalInvestment: -1000 };
+        expect(() => GridTradingConfig.parse(invalidConfig)).toThrow();
+      });
+
+      it('should reject total investment less than 1', () => {
+        const invalidConfig = { ...defaultConfig, totalInvestment: 0.5 };
+        expect(() => GridTradingConfig.parse(invalidConfig))
+          .toThrow('Total investment must be at least 1');
+      });
+
+      it('should reject total investment exceeding 1 billion', () => {
+        const invalidConfig = { ...defaultConfig, totalInvestment: 2e9 };
+        expect(() => GridTradingConfig.parse(invalidConfig))
+          .toThrow('Total investment must not exceed 1 billion');
+      });
+    });
+
+    describe('token address validations', () => {
+      it('should reject empty base token address', () => {
+        const invalidConfig = { ...defaultConfig, baseToken: '' };
+        expect(() => GridTradingConfig.parse(invalidConfig))
+          .toThrow('Base token address cannot be empty');
+      });
+
+      it('should reject invalid base token address format', () => {
+        const invalidConfig = { ...defaultConfig, baseToken: 'invalid-address' };
+        expect(() => GridTradingConfig.parse(invalidConfig))
+          .toThrow('Invalid base token address format');
+      });
+
+      it('should reject empty quote token address', () => {
+        const invalidConfig = { ...defaultConfig, quoteToken: '' };
+        expect(() => GridTradingConfig.parse(invalidConfig))
+          .toThrow('Quote token address cannot be empty');
+      });
+
+      it('should reject invalid quote token address format', () => {
+        const invalidConfig = { ...defaultConfig, quoteToken: 'invalid-address' };
+        expect(() => GridTradingConfig.parse(invalidConfig))
+          .toThrow('Invalid quote token address format');
+      });
+    });
+  });
 
   describe('constructor and configuration', () => {
     it('should create strategy with valid config', () => {
