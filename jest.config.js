@@ -4,11 +4,13 @@ export default {
   testEnvironment: 'node',
   transform: {
     '^.+\.tsx?$': ['ts-jest', {
-      useESM: true
+      useESM: true,
+      tsconfig: './tsconfig.json'
     }]
   },
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
-    '^(\.\.\/|\.\/)(.+)\.js$': '$1$2'
-  }
+    '^(\.\./|\./)(.*)\.js$': '$1$2'
+  },
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node']
 };
