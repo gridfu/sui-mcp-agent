@@ -74,6 +74,7 @@ class GridTradingStrategy {
 
     for (let i = 0; i <= gridCount; i++) {
       const price = lowerPrice + i * priceStep;
+      console.log(`Price: ${price}`);
       const buyOrderSize = investmentPerGrid / price;
       const sellOrderSize = buyOrderSize;
 
@@ -94,7 +95,7 @@ class GridTradingStrategy {
     this.currentPrice = currentPrice;
 
     for (const level of this.gridLevels) {
-      if (level.price < currentPrice && !level.buyOrder) {
+      if (level.price <= currentPrice && !level.buyOrder) {
         level.buyOrder = {
           price: level.price,
           size: level.buyOrderSize,
@@ -133,9 +134,13 @@ class GridTradingStrategy {
         const cost = filledBuyOrder.price * filledBuyOrder.size;
         this.position.quoteAmount -= cost;
         this.position.baseAmount += filledBuyOrder.size;
+        console.log(`Buy order filled at cost: ${cost}`);
+        console.log(`Buy order filled at quoteAmount: ${this.position.quoteAmount}`);
+        console.log(`Buy order filled at baseAmount: ${this.position.baseAmount}`);
 
         // Place new sell order at the next grid level up
         const sellPrice = level.price + (this.config.upperPrice - this.config.lowerPrice) / this.config.gridCount;
+        console.log(`Sell order placed at price: ${sellPrice}`);
         level.sellOrder = {
           price: sellPrice,
           size: filledBuyOrder.size,
@@ -153,15 +158,20 @@ class GridTradingStrategy {
         const revenue = filledSellOrder.price * filledSellOrder.size;
         this.position.baseAmount -= filledSellOrder.size;
         this.position.quoteAmount += revenue;
-
+        console.log(`Sell order filled at price: ${filledSellOrder.price}`);
+        console.log(`Sell order filled at size: ${filledSellOrder.size}`);
+        console.log(`Sell order filled at revenue: ${revenue}`);
+        console.log(`Sell order filled at baseAmount: ${this.position.baseAmount}`);
+        console.log(`Sell order filled at quoteAmount: ${this.position.quoteAmount}`);
         // Calculate realized PnL using the buy price from the filled buy order
         const buyPrice = level.buyOrder?.price || level.price;
         this.realizedPnL += (filledSellOrder.price - buyPrice) * filledSellOrder.size;
+        console.log(`Realized PnL: ${this.realizedPnL}`);
 
         // Place new buy order at the next grid level down
-        const buyPrice = level.price - (this.config.upperPrice - this.config.lowerPrice) / this.config.gridCount;
+        const nextBuyPrice = level.price - (this.config.upperPrice - this.config.lowerPrice) / this.config.gridCount;
         level.buyOrder = {
-          price: buyPrice,
+          price: nextBuyPrice,
           size: filledSellOrder.size,
           side: 'buy',
           status: 'pending'
