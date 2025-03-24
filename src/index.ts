@@ -5,6 +5,8 @@ import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { z } from "zod";
+import { GridTradingStrategy, GridTradingConfig } from "./grid-trading.js";
+
 
 // Create server instance
 export const server = new McpServer({
@@ -100,6 +102,37 @@ server.tool("transfer-sui", "Transfer SUI tokens to another address", {
       content: [{
         type: "text",
         text: `Error transferring SUI: ${errorMessage}`
+      }]
+    };
+  }
+});
+
+server.tool("create-grid-strategy", "Create a new grid trading strategy", {
+  upperPrice: z.number().positive().describe("Upper price limit for the grid"),
+  lowerPrice: z.number().positive().describe("Lower price limit for the grid"),
+  gridCount: z.number().int().positive().describe("Number of grid levels"),
+  totalInvestment: z.number().positive().describe("Total investment amount"),
+  baseToken: z.string().describe("Base token symbol"),
+  quoteToken: z.string().describe("Quote token symbol")
+}, async (config) => {
+  try {
+    const strategy = new GridTradingStrategy(config);
+    const gridLevels = strategy.getGridLevels();
+
+    return {
+      content: [{
+        type: "text",
+        text: `Grid Trading Strategy Created:\n\nGrid Levels:\n${gridLevels.map((level, index) =>
+          `${index + 1}. Price: ${level.price}\n   Buy Size: ${level.buyOrderSize}\n   Sell Size: ${level.sellOrderSize}\n`
+        ).join('')}\nNote: DEX integration pending for order placement.`
+      }]
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error creating grid strategy: ${errorMessage}`
       }]
     };
   }
