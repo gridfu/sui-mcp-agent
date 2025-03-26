@@ -1,222 +1,88 @@
 import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-// Grid Trading Configuration Schema
-const GridTradingConfig = z.object({
-  upperPrice: z.number().positive()
-    .refine(val => val <= 1e9, 'Upper price must not exceed 1 billion'),
-  lowerPrice: z.number().positive()
-    .refine(val => val >= 1e-9, 'Lower price must be at least 0.000000001'),
-  gridCount: z.number().int().positive()
-    .min(2, 'Grid count must be at least 2')
-    .max(100, 'Grid count must not exceed 100'),
-  totalInvestment: z.number().positive()
-    .min(1, 'Total investment must be at least 1')
-    .max(1e9, 'Total investment must not exceed 1 billion'),
-  baseToken: z.string()
-    .min(1, 'Base token address cannot be empty')
-    .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid base token address format'),
-  quoteToken: z.string()
-    .min(1, 'Quote token address cannot be empty')
-    .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid quote token address format'),
-}).refine(
-  data => data.upperPrice > data.lowerPrice,
-  'Upper price must be greater than lower price'
-);
+export interface GridTradingConfig {
+  upperPrice: number;
+  lowerPrice: number;
+  gridCount: number;
+  totalInvestment: number;
+  baseToken: string;
+  quoteToken: string;
+}
 
-type GridTradingConfig = z.infer<typeof GridTradingConfig>;
-
-interface GridLevel {
+export interface GridLevel {
   price: number;
   buyOrderSize: number;
   sellOrderSize: number;
-  buyOrder?: Order;
-  sellOrder?: Order;
 }
 
-interface Order {
-  price: number;
-  size: number;
-  side: 'buy' | 'sell';
-  status: 'pending' | 'filled' | 'cancelled';
-}
+export class GridTradingStrategy {
+  private readonly config: GridTradingConfig;
+  private readonly gridLevels: GridLevel[];
+  private readonly gridSpacing: number;
 
-interface Position {
-  baseAmount: number;  // Amount of base token (e.g., BTC)
-  quoteAmount: number; // Amount of quote token (e.g., USDT)
-}
-
-class GridTradingStrategy {
-  private config: GridTradingConfig;
-  private gridLevels: GridLevel[] = [];
-  private position: Position = {
-    baseAmount: 0,
-    quoteAmount: 0
-  };
-  private realizedPnL: number = 0;
-  private currentPrice: number = 0;
-  private priceStep: number;
-
-  constructor(config: GridTradingConfig, initialPosition?: Position, currentPrice?: number) {
+  constructor(config: GridTradingConfig) {
+    this.validateConfig(config);
     this.config = config;
-    this.priceStep = (config.upperPrice - config.lowerPrice) / config.gridCount;
-    this.calculateGridLevels();
-    if (initialPosition) {
-      this.position = initialPosition;
+    this.gridSpacing = (config.upperPrice - config.lowerPrice) / config.gridCount;
+    this.gridLevels = this.calculateGridLevels();
+  }
+
+  private validateConfig(config: GridTradingConfig) {
+    if (config.upperPrice <= config.lowerPrice) {
+      throw new Error('Upper price must be greater than lower price');
     }
-    if (currentPrice) {
-      this.currentPrice = currentPrice;
+    if (config.gridCount < 2) {
+      throw new Error('Grid count must be at least 2');
+    }
+    if (config.totalInvestment <= 0) {
+      throw new Error('Total investment must be greater than 0');
     }
   }
 
-  private calculateGridLevels() {
-    const { upperPrice, lowerPrice, gridCount, totalInvestment } = this.config;
-    const priceStep = (upperPrice - lowerPrice) / gridCount;
+  private calculateGridLevels(): GridLevel[] {
+    const levels: GridLevel[] = [];
+    const investmentPerGrid = this.config.totalInvestment / this.config.gridCount;
 
-    // Calculate fixed base asset amount per grid using average price
-    const avgPrice = (upperPrice + lowerPrice) / 2;
-    const totalBaseAsset = totalInvestment / avgPrice;
-    const baseAssetPerGrid = totalBaseAsset / gridCount;
-    console.log(`Base asset per grid: ${baseAssetPerGrid}`);
-    for (let i = 0; i <= gridCount; i++) {
-      const price = lowerPrice + i * priceStep;
+    for (let i = 0; i <= this.config.gridCount; i++) {
+      const price = this.config.lowerPrice + (i * this.gridSpacing);
+      const buyOrderSize = investmentPerGrid / price;
+      const sellOrderSize = buyOrderSize;
 
-      this.gridLevels.push({
+      levels.push({
         price,
-        buyOrderSize: baseAssetPerGrid,
-        sellOrderSize: baseAssetPerGrid
+        buyOrderSize,
+        sellOrderSize
       });
     }
+
+    return levels;
   }
 
   public getGridLevels(): GridLevel[] {
-    return this.gridLevels;
+    return [...this.gridLevels];
   }
 
-  // Method to place limit orders at each grid level
-  public async placeLimitOrders(currentPrice: number) {
-    this.currentPrice = currentPrice;
-
-    for (const level of this.gridLevels) {
-      if (level.price <= currentPrice && !level.buyOrder) {
-        level.buyOrder = {
-          price: level.price,
-          size: level.buyOrderSize,
-          side: 'buy',
-          status: 'pending'
-        };
-      }
-      if (level.price > currentPrice && !level.sellOrder && this.position.baseAmount >= level.sellOrderSize) {
-        level.sellOrder = {
-          price: level.price,
-          size: level.sellOrderSize,
-          side: 'sell',
-          status: 'pending'
-        };
-      }
-    }
-  }
-
-  // Method to monitor and update orders
-  public async monitorAndUpdateOrders(newPrice: number) {
-    const oldPrice = this.currentPrice;
-    this.currentPrice = newPrice;
-
-    // Process orders in the correct sequence based on price movement
-    const levels = newPrice > oldPrice ?
-      [...this.gridLevels].reverse() : // Process sell orders first when price moves up
-      this.gridLevels; // Process buy orders first when price moves down
-
-    for (const level of levels) {
-      // Check if buy orders are triggered when price moves down
-      if (level.buyOrder?.status === 'pending' &&
-          newPrice <= level.price && oldPrice > level.price) {
-        const filledBuyOrder = level.buyOrder;
-        level.buyOrder = undefined;
-
-        const cost = filledBuyOrder.price * filledBuyOrder.size;
-        this.position.quoteAmount -= cost;
-        this.position.baseAmount += filledBuyOrder.size;
-        console.log(`Buy order filled at price: ${filledBuyOrder.price}`);
-        console.log(`Buy order filled at size: ${filledBuyOrder.size}`);
-        console.log(`Buy order filled at cost: ${cost}`);
-        console.log(`Buy order filled at quoteAmount: ${this.position.quoteAmount}`);
-        console.log(`Buy order filled at baseAmount: ${this.position.baseAmount}`);
-
-        // Place new sell order at the next grid level up
-        const sellPrice = level.price + this.priceStep;
-        level.sellOrder = {
-          price: sellPrice,
-          size: filledBuyOrder.size,
-          side: 'sell',
-          status: 'pending'
-        };
-        console.log(`Sell order placed at price: ${sellPrice}`);
-      }
-
-      // Check if sell orders are triggered when price moves up
-      if (level.sellOrder?.status === 'pending' &&
-          newPrice >= level.price && oldPrice < level.price) {
-        const filledSellOrder = level.sellOrder;
-        level.sellOrder = undefined;
-
-        const revenue = filledSellOrder.price * filledSellOrder.size;
-        this.position.baseAmount -= filledSellOrder.size;
-        this.position.quoteAmount += revenue;
-        console.log(`Sell order filled at price: ${filledSellOrder.price}`);
-        console.log(`Sell order filled at size: ${filledSellOrder.size}`);
-        console.log(`Sell order filled at revenue: ${revenue}`);
-        console.log(`Sell order filled at baseAmount: ${this.position.baseAmount}`);
-        console.log(`Sell order filled at quoteAmount: ${this.position.quoteAmount}`);
-
-        // Calculate realized PnL using the buy price from the filled buy order
-        const buyPrice = level.price - this.priceStep;
-        this.realizedPnL += (filledSellOrder.price - buyPrice) * filledSellOrder.size;
-        console.log(`Realized PnL: ${this.realizedPnL}`);
-
-        // Place new buy order at the next grid level down
-        const nextBuyPrice = level.price - this.priceStep;
-        level.buyOrder = {
-          price: nextBuyPrice,
-          size: filledSellOrder.size,
-          side: 'buy',
-          status: 'pending'
-        };
-      }
+  public getCurrentGridIndex(currentPrice: number): number {
+    if (currentPrice < this.config.lowerPrice || currentPrice > this.config.upperPrice) {
+      throw new Error('Current price is outside the grid range');
     }
 
-    // Place new orders at current price level
-    for (const level of this.gridLevels) {
-      if (level.price <= newPrice && !level.buyOrder && !level.sellOrder) {
-        level.buyOrder = {
-          price: level.price,
-          size: level.buyOrderSize,
-          side: 'buy',
-          status: 'pending'
-        };
-      }
-      if (level.price > newPrice && !level.sellOrder && !level.buyOrder && this.position.baseAmount >= level.sellOrderSize) {
-        level.sellOrder = {
-          price: level.price,
-          size: level.sellOrderSize,
-          side: 'sell',
-          status: 'pending'
-        };
-      }
-    }
-
+    return Math.floor((currentPrice - this.config.lowerPrice) / this.gridSpacing);
   }
 
-  // Get current position
-  public getPosition(): Position {
-    return { ...this.position };
+  public getNextBuyPrice(currentPrice: number): number {
+    const currentIndex = this.getCurrentGridIndex(currentPrice);
+    return currentIndex > 0 ? this.gridLevels[currentIndex - 1].price : -1;
   }
 
-  // Method to calculate profit/loss
-  public calculatePnL(): number {
-    return this.realizedPnL;
+  public getNextSellPrice(currentPrice: number): number {
+    const currentIndex = this.getCurrentGridIndex(currentPrice);
+    return currentIndex < this.gridLevels.length - 1 ? this.gridLevels[currentIndex + 1].price : -1;
+  }
+
+  public getOrderSizeAtPrice(price: number, orderType: 'buy' | 'sell'): number {
+    const index = this.getCurrentGridIndex(price);
+    const level = this.gridLevels[index];
+    return orderType === 'buy' ? level.buyOrderSize : level.sellOrderSize;
   }
 }
-
-// Export the strategy for use in the MCP server
-export { GridTradingStrategy, GridTradingConfig };
