@@ -5,7 +5,7 @@ import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { z } from "zod";
-import { GridTradingStrategy, GridTradingConfig } from "./grid-trading.js";
+import { GridTradingStrategy } from "./grid-trading";
 
 
 // Create server instance
