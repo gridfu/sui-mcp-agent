@@ -343,9 +343,9 @@ describe('GridTradingStrategy', () => {
       // 52000: buy: undefined, sell: pending
       levels = strategy.getGridLevels();
       // check buy/sell orders at levels 1(49000): filled buy order at 49000, place sell order at 50000
+      expect(levels[1].buyOrder).toBeUndefined();
       expect(levels[1].sellOrder?.status).toBe('pending');
       expect(levels[1].sellOrder?.price).toBe(50000);
-      expect(levels[1].buyOrder).toBeUndefined();
       // check quoteAmount and baseAmount
       expect(strategy.getPosition().quoteAmount).toEqual(1510);
       expect(strategy.getPosition().baseAmount).toEqual(0.01);
@@ -405,16 +405,16 @@ describe('GridTradingStrategy', () => {
       // Price rises back to 51000
       await strategy.monitorAndUpdateOrders(51000);
       levels = strategy.getGridLevels();
-      // check buy/sell orders at levels 1(49000)
-      expect(levels[1].buyOrder?.status).toBe('pending');
-      expect(levels[1].buyOrder?.price).toBe(49000);
-      expect(levels[1].sellOrder).toBeUndefined();
       // check buy/sell orders at levels 2(50000)
-      expect(levels[2].buyOrder).toBeUndefined();
-      expect(levels[2].sellOrder?.status).toBe('pending');
-      expect(levels[2].sellOrder?.price).toBe(51000);
+      expect(levels[2].buyOrder?.status).toBe('pending');
+      expect(levels[2].buyOrder?.price).toBe(50000);
+      expect(levels[2].sellOrder).toBeUndefined();
+      // check buy/sell orders at levels 3(51000)
+      expect(levels[3].buyOrder).toBeUndefined();
+      expect(levels[3].sellOrder?.status).toBe('pending');
+      expect(levels[3].sellOrder?.price).toBe(52000);
       // check quoteAmount and baseAmount
-      expect(strategy.getPosition().quoteAmount).toEqual(1510);
+      expect(strategy.getPosition().quoteAmount).toEqual(1530);
       expect(strategy.getPosition().baseAmount).toEqual(0.01);
 
       const position = strategy.getPosition();
