@@ -60,10 +60,11 @@ describe('GridTradingStrategy', () => {
       const levels = strategy.getGridLevels();
       const investmentPerGrid = config.totalInvestment / config.gridCount;
 
-      levels.forEach(level => {
-        const expectedSize = investmentPerGrid / level.price;
-        expect(level.buyOrderSize).toBeCloseTo(expectedSize);
-        expect(level.sellOrderSize).toBeCloseTo(expectedSize);
+      levels.forEach((level, i) => {
+        const expectedBuySize = investmentPerGrid / level.price;
+        const expectedSellSize = i > 0 ? investmentPerGrid / levels[i - 1].price : 0;
+        expect(level.buyOrderSize).toBeCloseTo(expectedBuySize);
+        expect(level.sellOrderSize).toBeCloseTo(expectedSellSize);
       });
     });
   });
@@ -137,6 +138,54 @@ describe('GridTradingStrategy', () => {
       expect(levels.length).toBe(11);
       expect(levels[0].price).toBe(100000);
       expect(levels[10].price).toBe(1000000);
+    });
+  });
+
+  describe('execution triggers and PnL', () => {
+    let strategy: GridTradingStrategy;
+
+    beforeEach(() => {
+      strategy = new GridTradingStrategy(config);
+    });
+
+    it('should execute orders when crossing grid levels', () => {
+      const prices = [20000, 21000, 22000, 23000, 22000, 21000];
+      prices.forEach(price => strategy.checkPriceMovement(price));
+
+      const history = strategy.getTradeHistory();
+      expect(history.length).toBe(5);
+      expect(history.filter(o => o.type === 'sell').length).toBe(3);
+      expect(history.filter(o => o.type === 'buy').length).toBe(2);
+    });
+
+    it('should calculate PnL across multiple levels', () => {
+      strategy.checkPriceMovement(20000);
+      strategy.checkPriceMovement(21000);
+      strategy.checkPriceMovement(22000);
+      strategy.checkPriceMovement(23000);
+
+      const pnl = strategy.getCurrentProfitLoss(21000);
+      expect(pnl).toBeGreaterThan(0);
+    });
+
+    it('should record valid timestamps', () => {
+      strategy.checkPriceMovement(20000);
+      strategy.checkPriceMovement(21000);
+      const order = strategy.getTradeHistory()[0];
+      expect(order.timestamp).toBeInstanceOf(Date);
+      expect(order.timestamp.getTime()).toBeLessThanOrEqual(Date.now());
+    });
+
+    it('should maintain complete trade history', () => {
+      const testPrices = [25000, 26000, 27000, 26000, 25000];
+      testPrices.forEach(p => strategy.checkPriceMovement(p));
+
+      const history = strategy.getTradeHistory();
+      expect(history.length).toBe(4);
+      history.forEach(order => {
+        expect(order.quantity).toBeGreaterThan(0);
+        expect(order.price).toBeGreaterThan(0);
+      });
     });
   });
 });

@@ -15,10 +15,19 @@ export interface GridLevel {
   sellOrderSize: number;
 }
 
+export interface ExecutedOrder {
+  type: 'buy' | 'sell';
+  price: number;
+  quantity: number;
+  timestamp: Date;
+}
+
 export class GridTradingStrategy {
   private readonly config: GridTradingConfig;
   private readonly gridLevels: GridLevel[];
   private readonly gridSpacing: number;
+  private lastPrice: number | null = null;
+  private executedOrders: ExecutedOrder[] = [];
 
   constructor(config: GridTradingConfig) {
     this.validateConfig(config);
@@ -46,7 +55,7 @@ export class GridTradingStrategy {
     for (let i = 0; i <= this.config.gridCount; i++) {
       const price = this.config.lowerPrice + (i * this.gridSpacing);
       const buyOrderSize = investmentPerGrid / price;
-      const sellOrderSize = buyOrderSize;
+      const sellOrderSize = i > 0 ? levels[i - 1].buyOrderSize : 0;
 
       levels.push({
         price,
@@ -84,5 +93,54 @@ export class GridTradingStrategy {
     const index = this.getCurrentGridIndex(price);
     const level = this.gridLevels[index];
     return orderType === 'buy' ? level.buyOrderSize : level.sellOrderSize;
+  }
+
+  public checkPriceMovement(currentPrice: number): void {
+    if (this.lastPrice !== null) {
+      const currentIndex = this.getCurrentGridIndex(currentPrice);
+      const previousIndex = this.getCurrentGridIndex(this.lastPrice);
+
+      if (currentIndex > previousIndex) {
+        // Price moved up - execute sell at new level
+        this.executeSell(this.gridLevels[currentIndex].price);
+      } else if (currentIndex < previousIndex) {
+        // Price moved down - execute buy at new level
+        this.executeBuy(this.gridLevels[currentIndex].price);
+      }
+    }
+    this.lastPrice = currentPrice;
+  }
+
+  public getCurrentProfitLoss(currentPrice: number): number {
+    return this.executedOrders.reduce((acc, order) => {
+      const value = order.type === 'buy'
+        ? (currentPrice - order.price) * order.quantity
+        : (order.price - currentPrice) * order.quantity;
+      return acc + value;
+    }, 0);
+  }
+
+  private executeBuy(price: number): void {
+    const quantity = this.getOrderSizeAtPrice(price, 'buy');
+    this.executedOrders.push({
+      type: 'buy',
+      price,
+      quantity,
+      timestamp: new Date()
+    });
+  }
+
+  private executeSell(price: number): void {
+    const quantity = this.getOrderSizeAtPrice(price, 'sell');
+    this.executedOrders.push({
+      type: 'sell',
+      price,
+      quantity,
+      timestamp: new Date()
+    });
+  }
+
+  public getTradeHistory(): ExecutedOrder[] {
+    return [...this.executedOrders];
   }
 }
