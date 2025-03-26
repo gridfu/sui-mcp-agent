@@ -201,57 +201,57 @@ describe('GridTradingStrategy', () => {
       quoteAmount: 2000  // Initial USDT
     };
 
-    // it('should set up initial grid levels correctly', () => {
-    //   const strategy = new GridTradingStrategy(btcConfig, initialPosition, 50000);
-    //   const levels = strategy.getGridLevels();
+    it('should set up initial grid levels correctly', () => {
+      const strategy = new GridTradingStrategy(btcConfig, initialPosition, 50000);
+      const levels = strategy.getGridLevels();
 
-    //   expect(levels.length).toBe(5); // 4 grids = 5 price levels
-    //   expect(levels[0].price).toBe(48000);
-    //   expect(levels[4].price).toBe(52000);
+      expect(levels.length).toBe(5); // 4 grids = 5 price levels
+      expect(levels[0].price).toBe(48000);
+      expect(levels[4].price).toBe(52000);
 
-    //   // Verify grid spacing
-    //   const expectedStep = 1000; // (52000 - 48000) / 4
-    //   for (let i = 1; i < levels.length; i++) {
-    //     expect(levels[i].price - levels[i-1].price).toBe(expectedStep);
-    //   }
-    // });
+      // Verify grid spacing
+      const expectedStep = 1000; // (52000 - 48000) / 4
+      for (let i = 1; i < levels.length; i++) {
+        expect(levels[i].price - levels[i-1].price).toBe(expectedStep);
+      }
+    });
 
-    // it('should place initial orders correctly at 50000 USDT', async () => {
-    //   const strategy = new GridTradingStrategy(btcConfig, initialPosition, 50000);
-    //   await strategy.placeLimitOrders(50000);
-    //   const levels = strategy.getGridLevels();
+    it('should place initial orders correctly at 50000 USDT', async () => {
+      const strategy = new GridTradingStrategy(btcConfig, initialPosition, 50000);
+      await strategy.placeLimitOrders(50000);
+      const levels = strategy.getGridLevels();
 
-    //   expect(levels.length).toBe(5); // 4 grids = 4 orders
+      expect(levels.length).toBe(5); // 4 grids = 4 orders
 
-    //   // Verify buy orders below current price
-    //   expect(levels[0].buyOrder).toBeDefined();
-    //   expect(levels[0].buyOrder?.price).toBe(48000);
-    //   expect(levels[0].price).toBe(48000);
+      // Verify buy orders below current price
+      expect(levels[0].buyOrder).toBeDefined();
+      expect(levels[0].buyOrder?.price).toBe(48000);
+      expect(levels[0].price).toBe(48000);
 
-    //   expect(levels[1].buyOrder).toBeDefined();
-    //   expect(levels[1].buyOrder?.price).toBe(49000);
-    //   expect(levels[1].price).toBe(49000);
+      expect(levels[1].buyOrder).toBeDefined();
+      expect(levels[1].buyOrder?.price).toBe(49000);
+      expect(levels[1].price).toBe(49000);
 
-    //   expect(levels[2].buyOrder).toBeDefined();
-    //   expect(levels[2].buyOrder?.price).toBe(50000);
-    //   expect(levels[2].price).toBe(50000);
+      expect(levels[2].buyOrder).toBeDefined();
+      expect(levels[2].buyOrder?.price).toBe(50000);
+      expect(levels[2].price).toBe(50000);
 
-    //   // Verify sell orders above current price
-    //   expect(levels[3].sellOrder).toBeDefined();
-    //   expect(levels[3].sellOrder?.price).toBe(51000);
-    //   expect(levels[3].price).toBe(51000);
+      // no sell orders above current price
+      expect(levels[3].price).toBe(51000);
+      expect(levels[3].buyOrder).toBeUndefined();
+      expect(levels[3].sellOrder).toBeUndefined();
 
-    //   expect(levels[4].sellOrder).toBeDefined();
-    //   expect(levels[4].sellOrder?.price).toBe(52000);
-    //   expect(levels[4].price).toBe(52000);
-    // });
+      expect(levels[4].price).toBe(52000);
+      expect(levels[4].buyOrder).toBeUndefined();
+      expect(levels[4].sellOrder).toBeUndefined();
+    });
 
     it('should handle price drop to 49000 USDT correctly', async () => {
       const strategy = new GridTradingStrategy(btcConfig, initialPosition, 50000);
       await strategy.placeLimitOrders(50000);
       const position_init = strategy.getPosition();
-      expect(position_init.quoteAmount).toBeCloseTo(2000);
-      expect(position_init.baseAmount).toBeCloseTo(0);
+      expect(position_init.quoteAmount).toEqual(2000);
+      expect(position_init.baseAmount).toEqual(0);
 
       // check buy/sell orders at all levels
       const levels = strategy.getGridLevels();
@@ -272,13 +272,14 @@ describe('GridTradingStrategy', () => {
       expect(levels[2].buyOrder?.price).toBe(50000);
       expect(levels[2].sellOrder).toBeUndefined();
 
-      expect(levels[3].sellOrder?.status).toBe('pending');
-      expect(levels[3].sellOrder?.price).toBe(51000);
+      // no sell orders above current price
+      expect(levels[3].price).toBe(51000);
       expect(levels[3].buyOrder).toBeUndefined();
+      expect(levels[3].sellOrder).toBeUndefined();
 
-      expect(levels[4].sellOrder?.status).toBe('pending');
-      expect(levels[4].sellOrder?.price).toBe(52000);
+      expect(levels[4].price).toBe(52000);
       expect(levels[4].buyOrder).toBeUndefined();
+      expect(levels[4].sellOrder).toBeUndefined();
 
       // Simulate price drop to 49000 USDT
       await strategy.monitorAndUpdateOrders(49000);
@@ -294,16 +295,18 @@ describe('GridTradingStrategy', () => {
       expect(levels[2].buyOrder?.status).toBe('pending');
       expect(levels[2].buyOrder?.price).toBe(50000);
       expect(levels[2].sellOrder).toBeUndefined();
-      expect(levels[3].sellOrder?.status).toBe('pending');
-      expect(levels[3].sellOrder?.price).toBe(51000);
+      // no sell orders above current price
+      expect(levels[3].price).toBe(51000);
       expect(levels[3].buyOrder).toBeUndefined();
-      expect(levels[4].sellOrder?.status).toBe('pending');
-      expect(levels[4].sellOrder?.price).toBe(52000);
+      expect(levels[3].sellOrder).toBeUndefined();
+
+      expect(levels[4].price).toBe(52000);
       expect(levels[4].buyOrder).toBeUndefined();
+      expect(levels[4].sellOrder).toBeUndefined();
 
       const position = strategy.getPosition();
-      expect(position.baseAmount).toBeCloseTo(0.0102);
-      expect(position.quoteAmount).toBeCloseTo(1510);
+      expect(position.baseAmount).toEqual(0.01);
+      expect(position.quoteAmount).toEqual(1510);
     });
 
     it('should handle price recovery to 50000 USDT correctly', async () => {
@@ -316,32 +319,110 @@ describe('GridTradingStrategy', () => {
       await strategy.monitorAndUpdateOrders(50000);
 
       const position = strategy.getPosition();
-      expect(position.baseAmount).toBeCloseTo(0.01); // 0.02 - 0.01 sold
-      expect(position.quoteAmount).toBeCloseTo(2010); // 1510 + 500
-      expect(strategy.calculatePnL()).toBeCloseTo(10); // Profit from 49000 -> 50000
+      expect(position.baseAmount).toEqual(0.01); // 0.02 - 0.01 sold
+      expect(position.quoteAmount).toEqual(2010); // 1510 + 500
+      expect(strategy.calculatePnL()).toEqual(10); // Profit from 49000 -> 50000
     });
 
-    // it('should handle complete trading cycle with multiple price movements', async () => {
-    //   const strategy = new GridTradingStrategy(btcConfig, initialPosition, 50000);
-    //   await strategy.placeLimitOrders(50000);
+    it('should handle complete trading cycle with multiple price movements', async () => {
+      const strategy = new GridTradingStrategy(btcConfig, initialPosition, 50000);
+      await strategy.placeLimitOrders(50000);
 
-    //   // Price drops to 49000
-    //   await strategy.monitorAndUpdateOrders(49000);
-    //   // Price recovers to 50000
-    //   await strategy.monitorAndUpdateOrders(50000);
-    //   // Price rises to 51000
-    //   await strategy.monitorAndUpdateOrders(51000);
-    //   // Price drops to 50000
-    //   await strategy.monitorAndUpdateOrders(50000);
-    //   // Price rises back to 51000
-    //   await strategy.monitorAndUpdateOrders(51000);
+      let levels = strategy.getGridLevels();
+      expect(levels[1].buyOrder?.status).toBe('pending');
+      expect(levels[1].buyOrder?.price).toBe(49000);
+      expect(levels[1].sellOrder).toBeUndefined();
 
-    //   const position = strategy.getPosition();
-    //   console.log("position: ", position)
-    //   console.log("pnl: ", strategy.calculatePnL())
-    //   expect(position.quoteAmount).toBeCloseTo(2530);
-    //   expect(position.baseAmount).toBeCloseTo(0);
-    //   expect(strategy.calculatePnL()).toBeCloseTo(30); // Total profit from all trades
-    // });
+      // Price drops to 49000
+      await strategy.monitorAndUpdateOrders(49000);
+      // all levels detailed info:
+      // 48000: buy: pending, sell: undefined
+      // 49000: buy: undefined, sell: pending
+      // 50000: buy: pending, sell: undefined
+      // 51000: buy: undefined, sell: pending
+      // 52000: buy: undefined, sell: pending
+      levels = strategy.getGridLevels();
+      // check buy/sell orders at levels 1(49000): filled buy order at 49000, place sell order at 50000
+      expect(levels[1].sellOrder?.status).toBe('pending');
+      expect(levels[1].sellOrder?.price).toBe(50000);
+      expect(levels[1].buyOrder).toBeUndefined();
+      // check quoteAmount and baseAmount
+      expect(strategy.getPosition().quoteAmount).toEqual(1510);
+      expect(strategy.getPosition().baseAmount).toEqual(0.01);
+
+      // Price recovers to 50000
+      await strategy.monitorAndUpdateOrders(50000);
+      // all levels detailed info:
+      // 48000: buy: pending, sell: undefined
+      // 49000: buy: undefined, sell: pending
+      // 50000: buy: pending, sell: undefined
+      // 51000: buy: undefined, sell: pending
+      // 52000: buy: undefined, sell: pending
+      levels = strategy.getGridLevels();
+      // check buy/sell orders at levels 1(49000): filled sell order at 50000, place buy order at 49000
+      expect(levels[1].price).toBe(49000);
+      expect(levels[1].buyOrder?.status).toBe('pending');
+      expect(levels[1].buyOrder?.price).toBe(49000);
+      expect(levels[1].sellOrder).toBeUndefined();
+      // check buy/sell orders at levels 2(50000): filled buy order at 50000, place sell order at 51000
+      expect(levels[2].buyOrder).toBeUndefined();
+      expect(levels[2].sellOrder?.status).toBe('pending');
+      expect(levels[2].sellOrder?.price).toBe(51000);
+      // check quoteAmount and baseAmount
+      expect(strategy.getPosition().quoteAmount).toEqual(1510);
+      expect(strategy.getPosition().baseAmount).toEqual(0.01);
+
+      // Price rises to 51000
+      await strategy.monitorAndUpdateOrders(51000);
+      levels = strategy.getGridLevels();
+      // check buy/sell orders at levels 2(50000): filled sell order at 51000, place buy order at 50000
+      expect(levels[2].buyOrder?.status).toBe('pending');
+      expect(levels[2].buyOrder?.price).toBe(50000);
+      expect(levels[2].sellOrder).toBeUndefined();
+      // check buy/sell orders at levels 3(51000): filled buy order at 51000, place sell order at 52000
+      expect(levels[3].buyOrder).toBeUndefined();
+      expect(levels[3].sellOrder?.status).toBe('pending');
+      expect(levels[3].sellOrder?.price).toBe(52000);
+      // check quoteAmount and baseAmount
+      expect(strategy.getPosition().quoteAmount).toEqual(1520);
+      expect(strategy.getPosition().baseAmount).toEqual(0.01);
+
+      // Price drops to 50000
+      await strategy.monitorAndUpdateOrders(50000);
+      levels = strategy.getGridLevels();
+      // check buy/sell orders at levels 1(49000): since buy order is pending, no change
+      expect(levels[1].buyOrder?.status).toBe('pending');
+      expect(levels[1].buyOrder?.price).toBe(49000);
+      expect(levels[1].sellOrder).toBeUndefined();
+      // check buy/sell orders at levels 2(50000): filled buy order at 50000, place sell order at 51000
+      expect(levels[2].buyOrder).toBeUndefined();
+      expect(levels[2].sellOrder?.status).toBe('pending');
+      expect(levels[2].sellOrder?.price).toBe(51000);
+      // check quoteAmount and baseAmount
+      expect(strategy.getPosition().quoteAmount).toEqual(1020);
+      expect(strategy.getPosition().baseAmount).toEqual(0.02);
+
+      // Price rises back to 51000
+      await strategy.monitorAndUpdateOrders(51000);
+      levels = strategy.getGridLevels();
+      // check buy/sell orders at levels 1(49000)
+      expect(levels[1].buyOrder?.status).toBe('pending');
+      expect(levels[1].buyOrder?.price).toBe(49000);
+      expect(levels[1].sellOrder).toBeUndefined();
+      // check buy/sell orders at levels 2(50000)
+      expect(levels[2].buyOrder).toBeUndefined();
+      expect(levels[2].sellOrder?.status).toBe('pending');
+      expect(levels[2].sellOrder?.price).toBe(51000);
+      // check quoteAmount and baseAmount
+      expect(strategy.getPosition().quoteAmount).toEqual(1510);
+      expect(strategy.getPosition().baseAmount).toEqual(0.01);
+
+      const position = strategy.getPosition();
+      console.log("position: ", position)
+      console.log("pnl: ", strategy.calculatePnL())
+      expect(position.quoteAmount).toEqual(2530);
+      expect(position.baseAmount).toEqual(0);
+      expect(strategy.calculatePnL()).toEqual(30); // Total profit from all trades
+    });
   });
 });

@@ -55,9 +55,11 @@ class GridTradingStrategy {
   };
   private realizedPnL: number = 0;
   private currentPrice: number = 0;
+  private priceStep: number;
 
   constructor(config: GridTradingConfig, initialPosition?: Position, currentPrice?: number) {
     this.config = config;
+    this.priceStep = (config.upperPrice - config.lowerPrice) / config.gridCount;
     this.calculateGridLevels();
     if (initialPosition) {
       this.position = initialPosition;
@@ -104,7 +106,7 @@ class GridTradingStrategy {
           status: 'pending'
         };
       }
-      if (level.price > currentPrice && !level.sellOrder) {
+      if (level.price > currentPrice && !level.sellOrder && this.position.baseAmount >= level.sellOrderSize) {
         level.sellOrder = {
           price: level.price,
           size: level.sellOrderSize,
@@ -142,14 +144,14 @@ class GridTradingStrategy {
         console.log(`Buy order filled at baseAmount: ${this.position.baseAmount}`);
 
         // Place new sell order at the next grid level up
-        const sellPrice = level.price + (this.config.upperPrice - this.config.lowerPrice) / this.config.gridCount;
-        console.log(`Sell order placed at price: ${sellPrice}`);
+        const sellPrice = level.price + this.priceStep;
         level.sellOrder = {
           price: sellPrice,
           size: filledBuyOrder.size,
           side: 'sell',
           status: 'pending'
         };
+        console.log(`Sell order placed at price: ${sellPrice}`);
       }
 
       // Check if sell orders are triggered when price moves up
@@ -166,13 +168,14 @@ class GridTradingStrategy {
         console.log(`Sell order filled at revenue: ${revenue}`);
         console.log(`Sell order filled at baseAmount: ${this.position.baseAmount}`);
         console.log(`Sell order filled at quoteAmount: ${this.position.quoteAmount}`);
+
         // Calculate realized PnL using the buy price from the filled buy order
-        const buyPrice = level.buyOrder?.price || level.price;
+        const buyPrice = level.price - this.priceStep;
         this.realizedPnL += (filledSellOrder.price - buyPrice) * filledSellOrder.size;
         console.log(`Realized PnL: ${this.realizedPnL}`);
 
         // Place new buy order at the next grid level down
-        const nextBuyPrice = level.price - (this.config.upperPrice - this.config.lowerPrice) / this.config.gridCount;
+        const nextBuyPrice = level.price - this.priceStep;
         level.buyOrder = {
           price: nextBuyPrice,
           size: filledSellOrder.size,
@@ -181,11 +184,27 @@ class GridTradingStrategy {
         };
       }
     }
-  }
 
-  // Method to calculate profit/loss
-  public calculatePnL(): number {
-    return this.realizedPnL;
+    // Place new orders at current price level
+    for (const level of this.gridLevels) {
+      if (level.price <= newPrice && !level.buyOrder && !level.sellOrder) {
+        level.buyOrder = {
+          price: level.price,
+          size: level.buyOrderSize,
+          side: 'buy',
+          status: 'pending'
+        };
+      }
+      if (level.price > newPrice && !level.sellOrder && !level.buyOrder && this.position.baseAmount >= level.sellOrderSize) {
+        level.sellOrder = {
+          price: level.price,
+          size: level.sellOrderSize,
+          side: 'sell',
+          status: 'pending'
+        };
+      }
+    }
+
   }
 
   // Get current position
@@ -193,9 +212,9 @@ class GridTradingStrategy {
     return { ...this.position };
   }
 
-  // Get current price
-  public getCurrentPrice(): number {
-    return this.currentPrice;
+  // Method to calculate profit/loss
+  public calculatePnL(): number {
+    return this.realizedPnL;
   }
 }
 
