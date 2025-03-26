@@ -70,18 +70,19 @@ class GridTradingStrategy {
   private calculateGridLevels() {
     const { upperPrice, lowerPrice, gridCount, totalInvestment } = this.config;
     const priceStep = (upperPrice - lowerPrice) / gridCount;
-    const investmentPerGrid = totalInvestment / gridCount;
 
+    // Calculate fixed base asset amount per grid using average price
+    const avgPrice = (upperPrice + lowerPrice) / 2;
+    const totalBaseAsset = totalInvestment / avgPrice;
+    const baseAssetPerGrid = totalBaseAsset / gridCount;
+    console.log(`Base asset per grid: ${baseAssetPerGrid}`);
     for (let i = 0; i <= gridCount; i++) {
       const price = lowerPrice + i * priceStep;
-      console.log(`Price: ${price}`);
-      const buyOrderSize = investmentPerGrid / price;
-      const sellOrderSize = buyOrderSize;
 
       this.gridLevels.push({
         price,
-        buyOrderSize,
-        sellOrderSize,
+        buyOrderSize: baseAssetPerGrid,
+        sellOrderSize: baseAssetPerGrid
       });
     }
   }
@@ -134,6 +135,8 @@ class GridTradingStrategy {
         const cost = filledBuyOrder.price * filledBuyOrder.size;
         this.position.quoteAmount -= cost;
         this.position.baseAmount += filledBuyOrder.size;
+        console.log(`Buy order filled at price: ${filledBuyOrder.price}`);
+        console.log(`Buy order filled at size: ${filledBuyOrder.size}`);
         console.log(`Buy order filled at cost: ${cost}`);
         console.log(`Buy order filled at quoteAmount: ${this.position.quoteAmount}`);
         console.log(`Buy order filled at baseAmount: ${this.position.baseAmount}`);
