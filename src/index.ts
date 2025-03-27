@@ -248,6 +248,72 @@ server.tool("withdraw-from-flash-lender", "Withdraw SUI from the flash lender po
   }
 });
 
+server.tool("execute-flash-loan", "Execute a flash loan transaction", {
+  amount: z.number().positive().describe("The amount to borrow (in SUI)"),
+  privateKey: z.string().min(1).describe("The private key of the borrower's account"),
+  network: z.enum(['mainnet', 'testnet']).default('testnet').describe("The network to execute the flash loan on")
+}, async ({ amount, privateKey, network }) => {
+  try {
+    const client = network === 'mainnet' ? mainnetClient : testnetClient;
+    const keypair = Ed25519Keypair.fromSecretKey(privateKey);
+    const borrowerAddress = keypair.getPublicKey().toSuiAddress();
+    
+    // Convert SUI to MIST
+    const amountInMist = BigInt(Math.floor(amount * 1000000000));
+    
+    // Create a transaction for the flash loan
+    const tx = new Transaction();
+    
+    // 1. Call loan() function to borrow funds
+    const [loanResult, receipt] = tx.moveCall({
+      target: `${FLASH_LENDER_PACKAGE_ID}::example::loan`,
+      arguments: [
+        tx.object(FLASH_LENDER_OBJECT_ID),  // FlashLender shared object
+        tx.pure.u64(amountInMist)           // Amount to borrow
+      ],
+      typeArguments: [SUI_TYPE]
+    });
+
+    // your own process for flash loan
+    
+    // 2. Call repay() function to return the borrowed funds
+    tx.moveCall({
+      target: `${FLASH_LENDER_PACKAGE_ID}::example::repay`,
+      arguments: [
+        tx.object(FLASH_LENDER_OBJECT_ID),  // FlashLender shared object
+        loanResult,                         // The borrowed coin
+        receipt                             // The loan receipt
+      ],
+      typeArguments: [SUI_TYPE]
+    });
+
+    // Sign and execute the transaction
+    const result = await client.signAndExecuteTransaction({
+      signer: keypair,
+      transaction: tx,
+    });
+    
+    await client.waitForTransaction({ digest: result.digest });
+
+    return {
+      content: [{
+        type: "text",
+        text: `Successfully executed flash loan of ${amount} SUI by ${borrowerAddress}.\n` +
+              `Funds were borrowed and repaid in the same transaction.\n` +
+              `Transaction: https://suiscan.xyz/${network}/tx/${result.digest}`
+      }]
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error executing flash loan: ${errorMessage}`
+      }]
+    };
+  }
+});
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
