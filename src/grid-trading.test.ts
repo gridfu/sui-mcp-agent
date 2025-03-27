@@ -83,8 +83,8 @@ describe('GridTradingStrategy', () => {
     });
 
     it('should throw error for price outside grid range', () => {
-      expect(() => strategy.getCurrentGridIndex(19999)).toThrow('Current price is outside the grid range');
-      expect(() => strategy.getCurrentGridIndex(30001)).toThrow('Current price is outside the grid range');
+      expect(strategy.getCurrentGridIndex(19999)).toEqual(-1);
+      expect(strategy.getCurrentGridIndex(30001)).toEqual(-1);
     });
 
     it('should get correct next buy price', () => {
@@ -150,18 +150,14 @@ describe('GridTradingStrategy', () => {
 
     it('should execute orders when crossing grid levels', () => {
       const prices = [20000, 21000, 22000, 23000, 22000, 21000];
-      // what will happen at each price:
-      // 1. buy at 20000
-      // 2. sell at 21000
-      // 3. try to sell at 22000, but will sell nothing due to no buy order yet
-      // 4. try to sell at 23000, but will sell nothing due to no buy order yet
-      // 5. buy at 22000
-      // 6. buy at 21000
       prices.forEach(price => strategy.checkPriceMovement(price));
 
       const history = strategy.getTradeHistory();
       expect(history.length).toBe(4);
 
+      // Verify PnL matches FIFO calculation
+      const fifoPnl = strategy.getCurrentProfitLoss(21000);
+      expect(fifoPnl).toBeCloseTo(45.45, 2);
       // Verify order sequence
       const expectedPrices = [20000, 21000, 22000, 21000];
       const expectedGridIndices = [0, 1, 2, 1];
@@ -253,6 +249,15 @@ describe('GridTradingStrategy', () => {
       });
     });
 
+    it('should calculate PnL for mixed buy and sell orders', () => {
+      const prices = [20000, 21000, 22000, 21000, 20000];
+      prices.forEach(price => strategy.checkPriceMovement(price));
+      const history = strategy.getTradeHistory();
+      // Verify PnL matches FIFO calculation
+      const fifoPnl = strategy.getCurrentProfitLoss(20000);
+      expect(fifoPnl).toBeCloseTo(23.81, 2);
+    });
+
     describe('PnL calculation details', () => {
       beforeEach(() => {
         strategy = new GridTradingStrategy(config);
@@ -298,7 +303,6 @@ describe('GridTradingStrategy', () => {
         const inventoryValue = inventoryAmt * 22000;
         expect(inventoryValue).toBeCloseTo(0);
         const pnl = strategy.getCurrentProfitLoss(22000);
-        console.log("pnl: ", pnl);
         let buyAmount = 100000 / 10 / 20000;
         const expectedPnL = buyAmount * (21000 - 20000);
         expect(pnl).toBeCloseTo(expectedPnL);

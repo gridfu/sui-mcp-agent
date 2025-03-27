@@ -81,7 +81,7 @@ export class GridTradingStrategy {
 
   public getCurrentGridIndex(currentPrice: number): number {
     if (currentPrice < this.config.lowerPrice || currentPrice > this.config.upperPrice) {
-      throw new Error('Current price is outside the grid range');
+      return -1;
     }
 
     return Math.floor((currentPrice - this.config.lowerPrice) / this.gridSpacing);
@@ -127,25 +127,41 @@ export class GridTradingStrategy {
   }
 
   public getCurrentProfitLoss(currentPrice: number): number {
-    let totalBuyQty = 0;
-    let totalBuyCost = 0;
-    let totalSellQty = 0;
-    let totalReceived = 0;
+    const buyStack: Array<{price: number, quantity: number}> = [];
+    let realizedPnL = 0;
+    let totalRemainingQty = 0;
 
+    // Rebuild FIFO stack from executed orders
     for (const order of this.executedOrders) {
       if (order.type === 'buy') {
-        totalBuyQty += order.quantity;
-        totalBuyCost += order.price * order.quantity;
+        buyStack.push({ price: order.price, quantity: order.quantity });
+        totalRemainingQty += order.quantity;
       } else {
-        totalSellQty += order.quantity;
-        totalReceived += order.price * order.quantity;
+        let sellQtyRemaining = order.quantity;
+
+        // Process sells against oldest buys first
+        while (sellQtyRemaining > 0 && buyStack.length > 0) {
+          const oldestBuy = buyStack[0];
+          const usedQty = Math.min(sellQtyRemaining, oldestBuy.quantity);
+
+          realizedPnL += (order.price - oldestBuy.price) * usedQty;
+          oldestBuy.quantity -= usedQty;
+          totalRemainingQty -= usedQty;
+          sellQtyRemaining -= usedQty;
+
+          if (oldestBuy.quantity === 0) {
+            buyStack.shift();
+          }
+        }
       }
     }
 
-    const remainingQty = totalBuyQty - totalSellQty;
-    const currentValue = remainingQty * currentPrice;
-    const realizedPnL = totalReceived - totalBuyCost;
-    const unrealizedPnL = currentValue - (remainingQty > 0 ? remainingQty * this.config.lowerPrice : 0);
+    // Calculate unrealized PnL for remaining inventory
+    const averageCost = totalRemainingQty > 0
+      ? buyStack.reduce((sum, buy) => sum + buy.price * buy.quantity, 0) / totalRemainingQty
+      : 0;
+
+    const unrealizedPnL = totalRemainingQty * (currentPrice - averageCost);
 
     return realizedPnL + unrealizedPnL;
   }
