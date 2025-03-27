@@ -211,7 +211,8 @@ describe('GridTradingStrategy', () => {
         strategy.checkPriceMovement(21000);
 
         const pnl = strategy.getCurrentProfitLoss(21000);
-        const expectedPnL = (100000/10/20000 * 21000) - 100000;
+        let buyAmount = 100000/10/20000;
+        const expectedPnL = buyAmount * (21000 - 20000);
         expect(pnl).toBeCloseTo(expectedPnL);
       });
 

@@ -118,12 +118,14 @@ export class GridTradingStrategy {
 
   public getCurrentProfitLoss(currentPrice: number): number {
     let totalBuyQty = 0;
+    let totalBuyCost = 0;
     let totalSellQty = 0;
     let totalReceived = 0;
 
     for (const order of this.executedOrders) {
       if (order.type === 'buy') {
         totalBuyQty += order.quantity;
+        totalBuyCost += order.price * order.quantity;
       } else {
         totalSellQty += order.quantity;
         totalReceived += order.price * order.quantity;
@@ -132,12 +134,10 @@ export class GridTradingStrategy {
 
     const remainingQty = totalBuyQty - totalSellQty;
     const currentValue = remainingQty * currentPrice;
-    const totalCostOfBuys = this.executedOrders
-      .filter(o => o.type === 'buy')
-      .reduce((sum, order) => sum + (this.config.totalInvestment / this.config.gridCount), 0);
-    const totalPnL = (currentValue + totalReceived) - totalCostOfBuys;
+    const realizedPnL = totalReceived - totalBuyCost;
+    const unrealizedPnL = currentValue - (remainingQty > 0 ? remainingQty * this.config.lowerPrice : 0);
 
-    return totalPnL;
+    return realizedPnL + unrealizedPnL;
   }
 
   private executeBuy(price: number): void {
