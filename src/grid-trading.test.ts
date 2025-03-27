@@ -153,9 +153,52 @@ describe('GridTradingStrategy', () => {
       prices.forEach(price => strategy.checkPriceMovement(price));
 
       const history = strategy.getTradeHistory();
-      expect(history.length).toBe(5);
+
+      expect(history.length).toBe(6);
       expect(history.filter(o => o.type === 'sell').length).toBe(3);
-      expect(history.filter(o => o.type === 'buy').length).toBe(2);
+      expect(history.filter(o => o.type === 'buy').length).toBe(3);
+
+      // Check first buy order
+      expect(history[0].type).toBe('buy');
+      expect(history[0].price).toBe(20000);
+      expect(history[0].quantity).toBeCloseTo(0.5);
+      expect(history[0].timestamp).toBeInstanceOf(Date);
+      expect(history[0].gridIndex).toBe(0);
+
+      // Check first sell order
+      expect(history[1].type).toBe('sell');
+      expect(history[1].price).toBe(21000);
+      expect(history[1].quantity).toBeCloseTo(0.5);
+      expect(history[1].timestamp).toBeInstanceOf(Date);
+      expect(history[1].gridIndex).toBe(1);
+
+      // Check second sell order
+      expect(history[2].type).toBe('sell');
+      expect(history[2].price).toBe(22000);
+      expect(history[2].quantity).toBeCloseTo(0.47619047619047616);
+      expect(history[2].timestamp).toBeInstanceOf(Date);
+      expect(history[2].gridIndex).toBe(2);
+
+      // Check third sell order
+      expect(history[3].type).toBe('sell');
+      expect(history[3].price).toBe(23000);
+      expect(history[3].quantity).toBeCloseTo(0.45454545454545453);
+      expect(history[3].timestamp).toBeInstanceOf(Date);
+      expect(history[3].gridIndex).toBe(3);
+
+      // Check second buy order
+      expect(history[4].type).toBe('buy');
+      expect(history[4].price).toBe(22000);
+      expect(history[4].quantity).toBeCloseTo(0.45454545454545453);
+      expect(history[4].timestamp).toBeInstanceOf(Date);
+      expect(history[4].gridIndex).toBe(2);
+
+      // Check third buy order
+      expect(history[5].type).toBe('buy');
+      expect(history[5].price).toBe(21000);
+      expect(history[5].quantity).toBeCloseTo(0.47619047619047616);
+      expect(history[5].timestamp).toBeInstanceOf(Date);
+      expect(history[5].gridIndex).toBe(1);
     });
 
     describe('PnL calculation details', () => {

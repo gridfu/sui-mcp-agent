@@ -97,8 +97,12 @@ export class GridTradingStrategy {
   }
 
   public checkPriceMovement(currentPrice: number): void {
-    if (this.lastPrice !== null) {
-      const currentIndex = this.getCurrentGridIndex(currentPrice);
+    const currentIndex = this.getCurrentGridIndex(currentPrice);
+
+    if (this.lastPrice === null) {
+      // Initial position setup - execute buy at the current level
+      this.executeBuy(this.gridLevels[currentIndex].price);
+    } else {
       const previousIndex = this.getCurrentGridIndex(this.lastPrice);
 
       if (currentIndex > previousIndex) {
@@ -131,7 +135,7 @@ export class GridTradingStrategy {
     const totalCostOfBuys = this.executedOrders
       .filter(o => o.type === 'buy')
       .reduce((sum, order) => sum + (this.config.totalInvestment / this.config.gridCount), 0);
-const totalPnL = (currentValue + totalReceived) - totalCostOfBuys;
+    const totalPnL = (currentValue + totalReceived) - totalCostOfBuys;
 
     return totalPnL;
   }
