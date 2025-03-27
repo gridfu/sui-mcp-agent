@@ -29,12 +29,19 @@ export class GridTradingStrategy {
   private readonly gridSpacing: number;
   private lastPrice: number | null = null;
   private executedOrders: ExecutedOrder[] = [];
+  private baseTokenBalance: number = 0;
+  private quoteTokenBalance: number = 0;
+
+  private initializeBalances() {
+    this.quoteTokenBalance = this.config.totalInvestment;
+  }
 
   constructor(config: GridTradingConfig) {
     this.validateConfig(config);
     this.config = config;
     this.gridSpacing = (config.upperPrice - config.lowerPrice) / config.gridCount;
     this.gridLevels = this.calculateGridLevels();
+    this.quoteTokenBalance = config.totalInvestment;
   }
 
   private validateConfig(config: GridTradingConfig) {
@@ -100,18 +107,21 @@ export class GridTradingStrategy {
     const currentIndex = this.getCurrentGridIndex(currentPrice);
 
     if (this.lastPrice === null) {
-      // Initial position setup - execute buy at the current level
-      this.executeBuy(this.gridLevels[currentIndex].price);
-    } else {
-      const previousIndex = this.getCurrentGridIndex(this.lastPrice);
-
-      if (currentIndex > previousIndex) {
-        // Price moved up - execute sell at new level
-        this.executeSell(this.gridLevels[currentIndex].price);
-      } else if (currentIndex < previousIndex) {
-        // Price moved down - execute buy at new level
-        this.executeBuy(this.gridLevels[currentIndex].price);
+      // Only execute initial buy order if we're at the lowest grid level
+      if (currentIndex === 0) {
+        this.executeBuy(currentPrice);
       }
+      this.lastPrice = currentPrice;
+      return;
+    }
+
+    const previousIndex = this.getCurrentGridIndex(this.lastPrice);
+    if (currentIndex < previousIndex) {
+      // Execute buy order when price moves down to a new grid level
+      this.executeBuy(currentPrice);
+    } else if (currentIndex > previousIndex) {
+      // Execute sell order when price moves up to a new grid level
+      this.executeSell(currentPrice);
     }
     this.lastPrice = currentPrice;
   }
@@ -140,8 +150,14 @@ export class GridTradingStrategy {
     return realizedPnL + unrealizedPnL;
   }
 
-  private executeBuy(price: number): void {
+  private executeBuy(price: number): boolean {
     const quantity = this.getOrderSizeAtPrice(price, 'buy');
+    const cost = quantity * price;
+
+    if (this.quoteTokenBalance < cost) {
+      return false;
+    }
+
     const gridIndex = this.getCurrentGridIndex(price);
     this.executedOrders.push({
       type: 'buy',
@@ -150,10 +166,19 @@ export class GridTradingStrategy {
       timestamp: new Date(),
       gridIndex
     });
+
+    this.quoteTokenBalance -= cost;
+    this.baseTokenBalance += quantity;
+    return true;
   }
 
-  private executeSell(price: number): void {
+  private executeSell(price: number): boolean {
     const quantity = this.getOrderSizeAtPrice(price, 'sell');
+
+    if (this.baseTokenBalance < quantity) {
+      return false;
+    }
+
     const gridIndex = this.getCurrentGridIndex(price);
     this.executedOrders.push({
       type: 'sell',
@@ -162,6 +187,10 @@ export class GridTradingStrategy {
       timestamp: new Date(),
       gridIndex
     });
+
+    this.baseTokenBalance -= quantity;
+    this.quoteTokenBalance += quantity * price;
+    return true;
   }
 
   public getTradeHistory(): ExecutedOrder[] {
