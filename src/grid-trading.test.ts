@@ -203,7 +203,6 @@ describe('GridTradingStrategy', () => {
       prices.forEach(price => strategy.checkPriceMovement(price));
 
       const history = strategy.getTradeHistory();
-      console.log("history: ", history);
       expect(history.length).toBe(5);
 
       // Verify all orders are buy orders
@@ -223,36 +222,36 @@ describe('GridTradingStrategy', () => {
       });
     });
 
-    // it('should handle price oscillation within same grid level', () => {
-    //   const prices = [20500, 20600, 20400, 20300, 20700, 20400];
-    //   prices.forEach(price => strategy.checkPriceMovement(price));
+    it('should handle price oscillation within same grid level', () => {
+      const prices = [20500, 20600, 20400, 20300, 20700, 20400];
+      prices.forEach(price => strategy.checkPriceMovement(price));
 
-    //   const history = strategy.getTradeHistory();
-    //   expect(history.length).toBe(1);
-    //   expect(history[0].type).toBe('buy');
-    //   expect(history[0].price).toBe(20500);
-    //   expect(history[0].gridIndex).toBe(0);
-    // });
+      const history = strategy.getTradeHistory();
+      expect(history.length).toBe(1);
+      expect(history[0].type).toBe('buy');
+      expect(history[0].price).toBe(20500);
+      expect(history[0].gridIndex).toBe(0);
+    });
 
-    // it('should maintain correct order sequence for complex price movements', () => {
-    //   const prices = [20000, 20200, 21000, 22000, 22200, 22000, 21000, 20000];
-    //   prices.forEach(price => strategy.checkPriceMovement(price));
+    it('should maintain correct order sequence for complex price movements', () => {
+      const prices = [20000, 20200, 21000, 22000, 22200, 22000, 21000, 20000];
+      prices.forEach(price => strategy.checkPriceMovement(price));
+      const history = strategy.getTradeHistory();
+      // do not buy when price drop from 22200 to 22000, because it does not cross the grid level
+      expect(history.length).toBe(4);
 
-    //   const history = strategy.getTradeHistory();
-    //   expect(history.length).toBe(5);
+      // Verify order sequence
+      const expectedPrices = [20000, 21000, 21000, 20000];
+      const expectedGridIndices = [0, 1, 1, 0];
+      const orderTypes = ['buy', 'sell', 'buy', 'buy'];
 
-    //   // Verify order sequence
-    //   const expectedPrices = [20000, 21000, 22000, 21000, 20000];
-    //   const expectedGridIndices = [0, 1, 2, 1, 0];
-    //   const orderTypes = ['buy', 'sell', 'buy', 'buy', 'buy'];
-
-    //   history.forEach((order, index) => {
-    //     expect(order.type).toBe(orderTypes[index]);
-    //     expect(order.price).toBe(expectedPrices[index]);
-    //     expect(order.gridIndex).toBe(expectedGridIndices[index]);
-    //     expect(order.timestamp).toBeInstanceOf(Date);
-    //   });
-    // });
+      history.forEach((order, index) => {
+        expect(order.type).toBe(orderTypes[index]);
+        expect(order.price).toBe(expectedPrices[index]);
+        expect(order.gridIndex).toBe(expectedGridIndices[index]);
+        expect(order.timestamp).toBeInstanceOf(Date);
+      });
+    });
 
     // describe('PnL calculation details', () => {
     //   beforeEach(() => {
