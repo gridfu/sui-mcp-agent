@@ -253,122 +253,57 @@ describe('GridTradingStrategy', () => {
       });
     });
 
-    // describe('PnL calculation details', () => {
-    //   beforeEach(() => {
-    //     strategy = new GridTradingStrategy(config);
-    //   });
+    describe('PnL calculation details', () => {
+      beforeEach(() => {
+        strategy = new GridTradingStrategy(config);
+      });
 
-    //   it('should subtract initial investment from total value', () => {
-    //     strategy.checkPriceMovement(20000);
-    //     strategy.checkPriceMovement(21000);
+      it('should subtract initial investment from total value', () => {
+        strategy.checkPriceMovement(20000);
+        strategy.checkPriceMovement(21000);
 
-    //     const pnl = strategy.getCurrentProfitLoss(21000);
-    //     let buyAmount = 100000/10/20000;
-    //     const expectedPnL = buyAmount * (21000 - 20000);
-    //     expect(pnl).toBeCloseTo(expectedPnL);
-    //   });
+        const pnl = strategy.getCurrentProfitLoss(21000);
+        let buyAmount = 100000/10/20000;
+        const expectedPnL = buyAmount * (21000 - 20000);
+        expect(pnl).toBeCloseTo(expectedPnL);
+      });
 
-    //   it('should calculate inventory value at current price', () => {
-    //     strategy.checkPriceMovement(20000);
-    //     strategy.checkPriceMovement(21000);
-    //     strategy.checkPriceMovement(22000);
-    //     const history = strategy.getTradeHistory();
-    //     console.log(history);
-    //     // check all history
-    //     expect(history.length).toBe(3);
-    //     expect(history[0].type).toBe('buy');
-    //     expect(history[0].price).toBe(20000);
-    //     expect(history[0].quantity).toBeCloseTo(100000/10/20000);
-    //     expect(history[0].timestamp).toBeInstanceOf(Date);
-    //     expect(history[0].gridIndex).toBe(0);
-    //     expect(history[1].type).toBe('sell');
-    //     expect(history[1].price).toBe(21000);
-    //     expect(history[1].quantity).toBeCloseTo(100000/10/21000);
-    //     expect(history[1].timestamp).toBeInstanceOf(Date);
-    //     expect(history[1].gridIndex).toBe(1);
-    //     expect(history[2].type).toBe('sell');
-    //     expect(history[2].price).toBe(22000);
-    //     expect(history[2].quantity).toBeCloseTo(100000/10/22000);
-    //     expect(history[2].timestamp).toBeInstanceOf(Date);
-    //     expect(history[2].gridIndex).toBe(2);
-    //     const inventoryValue = history.reduce((acc, order) => {
-    //       if (order.type === 'buy') {
-    //         return acc + order.quantity * order.price;
-    //       } else {
-    //         return acc - order.quantity * order.price;
-    //       }
-    //     }, 0);
-    //     // print inventoryValue
-    //     console.log(inventoryValue);
-    //     expect(inventoryValue).toBeCloseTo(100000/10/20000 * 20000);
-    //     const pnl = strategy.getCurrentProfitLoss(22000);
-    //     // inventoryValue = boughtQty * currentPrice - soldQty * currentPrice
-    //     // const inventoryValue = (100000/10/20000 * 20000) - (100000/10/21000 * 22000);
-    //     const expectedPnL = inventoryValue - (100000/10 * 2) + (100000/10/21000 * 22000);
-    //     expect(pnl).toBeCloseTo(expectedPnL);
-    //   });
+      it('should calculate inventory value at current price', () => {
+        const prices = [20000, 21000, 22000];
+        prices.forEach(price => strategy.checkPriceMovement(price));
+        const history = strategy.getTradeHistory();
+        // check all history
+        expect(history.length).toBe(2);
 
-    //   it('should track accumulated realized profits', () => {
-    //     strategy.checkPriceMovement(20000);
-    //     strategy.checkPriceMovement(21000);
-    //     strategy.checkPriceMovement(22000);
-    //     strategy.checkPriceMovement(21000);
+        // Verify order sequence
+        const expectedPrices = [20000, 21000];
+        const expectedGridIndices = [0, 1];
+        const orderTypes = ['buy', 'sell'];
+        history.forEach((order, index) => {
+          expect(order.type).toBe(orderTypes[index]);
+          expect(order.price).toBe(expectedPrices[index]);
+          expect(order.gridIndex).toBe(expectedGridIndices[index]);
+          expect(order.timestamp).toBeInstanceOf(Date);
+        });
+        // verify Profit and Loss
+        // inventoryAmt = boughtQty - soldQty
+        const inventoryAmt = history.reduce((acc, order) => {
+          if (order.type === 'buy') {
+            return acc - order.quantity;
+          } else {
+            return acc + order.quantity;
+          }
+        }, 0);
+        expect(inventoryAmt).toBeCloseTo(0);
+        const inventoryValue = inventoryAmt * 22000;
+        expect(inventoryValue).toBeCloseTo(0);
+        const pnl = strategy.getCurrentProfitLoss(22000);
+        console.log("pnl: ", pnl);
+        let buyAmount = 100000 / 10 / 20000;
+        const expectedPnL = buyAmount * (21000 - 20000);
+        expect(pnl).toBeCloseTo(expectedPnL);
+      });
+    });
 
-    //     const pnl = strategy.getCurrentProfitLoss(20000);
-    //     const realizedProfit = (100000/10/20000 * 21000) - (100000/10/21000 * 22000);
-    //     expect(pnl).toBeCloseTo(realizedProfit - 100000);
-    //   });
-
-    //   it('should handle partial sells with remaining inventory', () => {
-    //     // Initial buy
-    //     strategy.checkPriceMovement(20000);
-
-    //     // Partial sell at higher level
-    //     strategy.checkPriceMovement(21000);
-    //     strategy.checkPriceMovement(20000);
-
-    //     const pnl = strategy.getCurrentProfitLoss(20000);
-    //     const remainingQty = 100000/10/20000 - 100000/10/21000;
-    //     const expectedPnL = (remainingQty * 20000) - (100000/10) + (100000/10/21000 * 21000);
-    //     expect(pnl).toBeCloseTo(expectedPnL);
-    //   });
-    // });
-
-    // it('should calculate PnL across multiple levels', () => {
-    //   strategy.checkPriceMovement(20000);
-    //   strategy.checkPriceMovement(21000);
-    //   strategy.checkPriceMovement(22000);
-    //   strategy.checkPriceMovement(23000);
-
-    //   const pnl = strategy.getCurrentProfitLoss(21000);
-    //   const boughtQty = (100000/10)/20000 + (100000/10)/21000;
-    //   const soldValue = (100000/10)/20000 * 22000;
-    //   const inventoryValue = (100000/10)/21000 * 21000;
-    //   const totalCostOfBuys = 2 * (100000 / 10);
-    //   const totalBuysCost = 2 * (100000 / 10);
-    //   const soldProfit = (100000/10)/20000 * 22000;
-    //   const remainingValue = (100000/10)/21000 * 21000;
-    //   expect(pnl).toBeCloseTo(1385.28, 2); // Allowing 2 decimal places for calculation precision
-    // });
-
-    // it('should record valid timestamps', () => {
-    //   strategy.checkPriceMovement(20000);
-    //   strategy.checkPriceMovement(21000);
-    //   const order = strategy.getTradeHistory()[0];
-    //   expect(order.timestamp).toBeInstanceOf(Date);
-    //   expect(order.timestamp.getTime()).toBeLessThanOrEqual(Date.now());
-    // });
-
-    // it('should maintain complete trade history', () => {
-    //   const testPrices = [25000, 26000, 27000, 26000, 25000];
-    //   testPrices.forEach(p => strategy.checkPriceMovement(p));
-
-    //   const history = strategy.getTradeHistory();
-    //   expect(history.length).toBe(4);
-    //   history.forEach(order => {
-    //     expect(order.quantity).toBeGreaterThan(0);
-    //     expect(order.price).toBeGreaterThan(0);
-    //   });
-    // });
   });
 });
