@@ -158,6 +158,57 @@ describe('GridTradingStrategy', () => {
       expect(history.filter(o => o.type === 'buy').length).toBe(2);
     });
 
+    describe('PnL calculation details', () => {
+      beforeEach(() => {
+        strategy = new GridTradingStrategy(config);
+      });
+
+      it('should subtract initial investment from total value', () => {
+        strategy.checkPriceMovement(20000);
+        strategy.checkPriceMovement(21000);
+
+        const pnl = strategy.getCurrentProfitLoss(21000);
+        const expectedPnL = (100000/10/20000 * 21000) - 100000;
+        expect(pnl).toBeCloseTo(expectedPnL);
+      });
+
+      it('should calculate inventory value at current price', () => {
+        strategy.checkPriceMovement(20000);
+        strategy.checkPriceMovement(21000);
+        strategy.checkPriceMovement(22000);
+
+        const pnl = strategy.getCurrentProfitLoss(25000);
+        const inventoryValue = (100000/10/20000 - 100000/10/21000) * 25000;
+        const expectedPnL = inventoryValue - (100000/10 * 2) + (100000/10/21000 * 22000);
+        expect(pnl).toBeCloseTo(expectedPnL);
+      });
+
+      it('should track accumulated realized profits', () => {
+        strategy.checkPriceMovement(20000);
+        strategy.checkPriceMovement(21000);
+        strategy.checkPriceMovement(22000);
+        strategy.checkPriceMovement(21000);
+
+        const pnl = strategy.getCurrentProfitLoss(20000);
+        const realizedProfit = (100000/10/20000 * 21000) - (100000/10/21000 * 22000);
+        expect(pnl).toBeCloseTo(realizedProfit - 100000);
+      });
+
+      it('should handle partial sells with remaining inventory', () => {
+        // Initial buy
+        strategy.checkPriceMovement(20000);
+
+        // Partial sell at higher level
+        strategy.checkPriceMovement(21000);
+        strategy.checkPriceMovement(20000);
+
+        const pnl = strategy.getCurrentProfitLoss(20000);
+        const remainingQty = 100000/10/20000 - 100000/10/21000;
+        const expectedPnL = (remainingQty * 20000) - (100000/10) + (100000/10/21000 * 21000);
+        expect(pnl).toBeCloseTo(expectedPnL);
+      });
+    });
+
     it('should calculate PnL across multiple levels', () => {
       strategy.checkPriceMovement(20000);
       strategy.checkPriceMovement(21000);
@@ -165,7 +216,14 @@ describe('GridTradingStrategy', () => {
       strategy.checkPriceMovement(23000);
 
       const pnl = strategy.getCurrentProfitLoss(21000);
-      expect(pnl).toBeGreaterThan(0);
+      const boughtQty = (100000/10)/20000 + (100000/10)/21000;
+      const soldValue = (100000/10)/20000 * 22000;
+      const inventoryValue = (100000/10)/21000 * 21000;
+      const totalCostOfBuys = 2 * (100000 / 10);
+      const totalBuysCost = 2 * (100000 / 10);
+      const soldProfit = (100000/10)/20000 * 22000;
+      const remainingValue = (100000/10)/21000 * 21000;
+      expect(pnl).toBeCloseTo(1385.28, 2); // Allowing 2 decimal places for calculation precision
     });
 
     it('should record valid timestamps', () => {

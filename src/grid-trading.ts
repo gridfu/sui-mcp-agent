@@ -20,6 +20,7 @@ export interface ExecutedOrder {
   price: number;
   quantity: number;
   timestamp: Date;
+  gridIndex: number;
 }
 
 export class GridTradingStrategy {
@@ -112,31 +113,50 @@ export class GridTradingStrategy {
   }
 
   public getCurrentProfitLoss(currentPrice: number): number {
-    return this.executedOrders.reduce((acc, order) => {
-      const value = order.type === 'buy'
-        ? (currentPrice - order.price) * order.quantity
-        : (order.price - currentPrice) * order.quantity;
-      return acc + value;
-    }, 0);
+    let totalBuyQty = 0;
+    let totalSellQty = 0;
+    let totalReceived = 0;
+
+    for (const order of this.executedOrders) {
+      if (order.type === 'buy') {
+        totalBuyQty += order.quantity;
+      } else {
+        totalSellQty += order.quantity;
+        totalReceived += order.price * order.quantity;
+      }
+    }
+
+    const remainingQty = totalBuyQty - totalSellQty;
+    const currentValue = remainingQty * currentPrice;
+    const totalCostOfBuys = this.executedOrders
+      .filter(o => o.type === 'buy')
+      .reduce((sum, order) => sum + (this.config.totalInvestment / this.config.gridCount), 0);
+const totalPnL = (currentValue + totalReceived) - totalCostOfBuys;
+
+    return totalPnL;
   }
 
   private executeBuy(price: number): void {
     const quantity = this.getOrderSizeAtPrice(price, 'buy');
+    const gridIndex = this.getCurrentGridIndex(price);
     this.executedOrders.push({
       type: 'buy',
       price,
       quantity,
-      timestamp: new Date()
+      timestamp: new Date(),
+      gridIndex
     });
   }
 
   private executeSell(price: number): void {
     const quantity = this.getOrderSizeAtPrice(price, 'sell');
+    const gridIndex = this.getCurrentGridIndex(price);
     this.executedOrders.push({
       type: 'sell',
       price,
       quantity,
-      timestamp: new Date()
+      timestamp: new Date(),
+      gridIndex
     });
   }
 
