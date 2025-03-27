@@ -197,6 +197,57 @@ server.tool("deposit-to-flash-lender", "Deposit SUI to the flash lender pool", {
   }
 });
 
+server.tool("withdraw-from-flash-lender", "Withdraw SUI from the flash lender pool", {
+  amount: z.number().positive().describe("The amount of SUI to withdraw"),
+  privateKey: z.string().min(1).describe("The private key of the sender's account (must be admin)"),
+  network: z.enum(['mainnet', 'testnet']).default('testnet').describe("The network to execute the withdrawal on")
+}, async ({ amount, privateKey, network }) => {
+  try {
+    const client = network === 'mainnet' ? mainnetClient : testnetClient;
+    const keypair = Ed25519Keypair.fromSecretKey(privateKey);
+    const senderAddress = keypair.getPublicKey().toSuiAddress();
+    
+    // Convert SUI to MIST
+    const amountInMist = BigInt(Math.floor(amount * 1000000000));
+    
+    // Create a transaction to withdraw funds
+    const tx = new Transaction();
+    
+    // Call the withdraw_and_transfer function 
+    tx.moveCall({
+      target: `${FLASH_LENDER_PACKAGE_ID}::example::withdraw_and_transfer`,
+      arguments: [
+        tx.object(FLASH_LENDER_OBJECT_ID),  // FlashLender shared object
+        tx.pure.u64(amountInMist)           // Amount to withdraw
+      ],
+      typeArguments: [SUI_TYPE],            // Using SUI as the token type
+    });
+
+    // Sign and execute the transaction
+    const result = await client.signAndExecuteTransaction({
+      signer: keypair,
+      transaction: tx,
+    });
+    
+    await client.waitForTransaction({ digest: result.digest });
+
+    return {
+      content: [{
+        type: "text",
+        text: `Successfully withdrew ${amount} SUI from the flash loan pool to ${senderAddress}.\nTransaction: https://suiscan.xyz/${network}/tx/${result.digest}`
+      }]
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error withdrawing from flash loan pool: ${errorMessage}`
+      }]
+    };
+  }
+});
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
