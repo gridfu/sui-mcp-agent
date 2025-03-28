@@ -185,7 +185,12 @@ function getCoinType(coinType: string) {
 }
 
 function getExchangeRate(payDecimals: number, targetDecimals: number, exchangeRate: number): bigint {
-    return BigInt(exchangeRate * 10 ** (RATE_SCALE + targetDecimals - payDecimals));
+    const rateScale = parseInt(RATE_SCALE.toString());
+    const payDecimalsInt = parseInt(payDecimals.toString());
+    const targetDecimalsInt = parseInt(targetDecimals.toString());
+    const exchangeRateNumber = Number(exchangeRate);
+    const finalDecimals = rateScale + targetDecimalsInt - payDecimalsInt;
+    return BigInt(exchangeRate * 10 ** (finalDecimals));
 }
 
 
