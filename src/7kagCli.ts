@@ -4,11 +4,11 @@ import "bignumber.js";
 import "bn.js";
 
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
-import { Transaction } from '@mysten/sui/transactions';
-import { ExecuteTransactionBlockParams } from '@mysten/sui/client';
+import type { Transaction } from '@mysten/sui/transactions';
+import type { ExecuteTransactionBlockParams } from '@mysten/sui/client';
 import sdk from "@7kprotocol/sdk-ts";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import process from "process";
+import process from "node:process";
 import { Command } from "commander";
 
 const ED25519_DERIVATION_PATH = `m/44'/784'/0'/0'/0'`;
@@ -216,9 +216,9 @@ program.command('placeLimitOrder')
     // Say one USDC is worth 0.25 SUI. Then the rate is 0.25 * 10^(SUI_DECIMALS - USDC_DECIMALS) * 10^RATE_SCALE.
     // 0.25 * 10^(9 - 6) * 10^12 = 250000000000000. USDC decimals = 6, SUI decimals = 9, so rate scale = 12.
     .requiredOption("-r, --rate <rate>", "Exchange rate of 1 pay coin to target coin")
-    .option("-s, --slippage <slippage>", "Slippage tolerance, scaled by 10^4. For example: 1% slippage = 0.01 * 10^4 = 100", 100)
+    .option("-s, --slippage <slippage>", "Slippage tolerance, scaled by 10^4. For example: 1% slippage = 0.01 * 10^4 = 100", "100")
     .option("-e, --expire <expire>", "Expiration timestamp in Unix format (milliseconds)")
-    .option("--expireDays <expireDays>", "Expiration in days", 7)
+    .option("--expireDays <expireDays>", "Expiration in days", "7")
     .option("--expireHours <expireHours>", "Expiration in hours")
     .option("--expireMinutes <expireMinutes>", "Expiration in minutes")
     .option("--expireSeconds <expireSeconds>", "Expiration in seconds")
