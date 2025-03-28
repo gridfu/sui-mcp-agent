@@ -7,6 +7,8 @@ import { bcs } from "@mysten/sui/bcs";
 import { z } from "zod";
 import { GridTradingStrategy } from "./grid-trading.js";
 
+import {spawnSync} from 'child_process';
+
 
 // Create server instance
 export const server = new McpServer({
@@ -166,6 +168,165 @@ const history = gridStrategy.getTradeHistory();
       content: [{
         type: "text",
         text: `Error list orders: ${errorMessage}`
+      }]
+    };
+  }
+});
+
+  // we want to execute the 7kagCli.ts file with bun and above arguments
+
+  // const program = new Command();
+
+// program
+//     .name('7kagCli')
+//     .description('CLI to control limit orders with 7kag')
+//     .version('0.0.1');
+
+// program.command('listLimitOrders')
+//     .description('List open or closed limit orders')
+//     .option("-o, --open <true/false>", "List open orders", parseBool, true)
+//     .option("-c, --closed <true/false>", "List closed orders", parseBool, true)
+//     .option("-a, --account <account>", "The account address to list orders for")
+//     .option("--offset <offset>", "The offset for the list")
+//     .option("--limit <limit>", "The limit for the list")
+//     .option("-t, --tokenPair <tokenPair>", "The token pair to filter by", `${SUI_COIN_TYPE}-${USDC_COIN_TYPE}`)
+//     .action(listLimitOrders);
+
+// program.command('placeLimitOrder')
+//     .description('Place a limit order')
+//     .option("-n, --dryRun <true/false>", "Dry run the transaction", parseBool, true)
+//     .option("-p, --pay <pay>", "The coin type to pay with (e.g., USDC)", USDC_COIN_TYPE)
+//     .option("--payDecimals <decimals>", "The decimals of the coin to pay with")
+//     .option("--gasBudget <budget>", "The gas budget for the transaction")
+//     .option("-t, --target <target>", "The coin type to receive (e.g., SUI)", SUI_COIN_TYPE)
+//     .option("--targetDecimals <decimals>", "The decimals of the coin to receive")
+//     .requiredOption("-a, --amount <amount>", "Amount to pay, scaled by the coin's decimals (e.g., 0.1 USDC = 100000 for 6 decimals)")
+//     // Say one USDC is worth 0.25 SUI. Then the rate is 0.25 * 10^(SUI_DECIMALS - USDC_DECIMALS) * 10^RATE_SCALE.
+//     // 0.25 * 10^(9 - 6) * 10^12 = 250000000000000. USDC decimals = 6, SUI decimals = 9, so rate scale = 12.
+//     .requiredOption("-r, --rate <rate>", "Exchange rate of 1 pay coin to target coin")
+//     .option("-s, --slippage <slippage>", "Slippage tolerance, scaled by 10^4. For example: 1% slippage = 0.01 * 10^4 = 100", "100")
+//     .option("-e, --expire <expire>", "Expiration timestamp in Unix format (milliseconds)")
+//     .option("--expireDays <expireDays>", "Expiration in days", "7")
+//     .option("--expireHours <expireHours>", "Expiration in hours")
+//     .option("--expireMinutes <expireMinutes>", "Expiration in minutes")
+//     .option("--expireSeconds <expireSeconds>", "Expiration in seconds")
+//     .option("-d, --devInspect <true/false>", "Set to true for development inspection mode", parseBool, true)
+//     .option("--showInput <true/false>", "Show input for the transaction", parseBool, true)
+//     .option("--showEffects <true/false>", "Show effects of the transaction", parseBool, true)
+//     .option("--showEvents <true/false>", "Show events of the transaction", parseBool, true)
+//     .option("--showObjectChanges <true/false>", "Show object changes of the transaction", parseBool, true)
+//     .option("--showBalanceChanges <true/false>", "Show balance changes of the transaction", parseBool, true)
+//     .option("--showRawEffects <true/false>", "Show raw effects of the transaction", parseBool, true)
+//     .option("--showRawInput <true/false>", "Show raw input of the transaction", parseBool, true)
+//     .action(placeLimitOrder);
+
+// program.command("cancelLimitOrder")
+//     .description('Cancel a limit order')
+//     .option("-n, --dryRun <true/false>", "Dry run the transaction", parseBool, true)
+//     .requiredOption("-i, --orderId <orderId>", "The unique order ID (retrieved from getOpenLimitOrders)")
+//     .option("-p, --pay <pay>", "The coin type used for payment (e.g., USDC)", USDC_COIN_TYPE)
+//     .option("-t, --target <target>", "The target coin type (e.g., SUI)", SUI_COIN_TYPE)
+//     .action(cancelLimitOrder)
+
+// program.command("claimExpiredLimitOrder")
+//     .description('Claim assets from an expired limit order')
+//     .option("-n, --dryRun <true/false>", "Dry run the transaction", parseBool, true)
+//     .requiredOption("-i, --orderId <orderId>", "The unique order ID (retrieved from getOpenLimitOrders)")
+//     .option("-p, --pay <pay>", "The coin type used for payment (e.g., USDC)", USDC_COIN_TYPE)
+//     .option("-t, --target <target>", "The target coin type (e.g., SUI)", SUI_COIN_TYPE)
+//     .action(claimExpiredLimitOrder)
+
+// program.parse();
+
+// Create server tool from above command line parsing, for example we want to make a tool
+// called place-limit-order, we can do it like this:
+// server.tool("place-limit-order", "Place a limit order", {
+// ...
+  // We will run the command bun ./7kagCli listLimitOrders -o true -c false -a 0x1
+  // and return the result here
+server.tool("place-limit-order", "Place a limit order on 7kag protocol", {
+  pay: z.string().describe("The coin type to pay with"),
+  payDecimals: z.number().describe("The decimals of the coin to pay with"),
+  target: z.string().describe("The coin type to receive"),
+  targetDecimals: z.number().describe("The decimals of the coin to receive"),
+  amount: z.string().describe("Amount to pay, scaled by the coin's decimals"),
+  rate: z.string().describe("Exchange rate of 1 pay coin to target coin"),
+  slippage: z.string().describe("Slippage tolerance, scaled by 10^4"),
+  expire: z.string().describe("Expiration timestamp in Unix format (milliseconds)"),
+  expireDays: z.number().describe("Expiration in days"),
+  expireHours: z.number().describe("Expiration in hours"),
+  expireMinutes: z.number().describe("Expiration in minutes"),
+  expireSeconds: z.number().describe("Expiration in seconds"),
+  dryRun: z.boolean().describe("Dry run the transaction"),
+  devInspect: z.boolean().describe("Set to true for development inspection mode"),
+  showInput: z.boolean().describe("Show input for the transaction"),
+  showEffects: z.boolean().describe("Show effects of the transaction"),
+  showEvents: z.boolean().describe("Show events of the transaction"),
+  showObjectChanges: z.boolean().describe("Show object changes of the transaction"),
+  showBalanceChanges: z.boolean().describe("Show balance changes of the transaction"),
+  showRawEffects: z.boolean().describe("Show raw effects of the transaction"),
+  showRawInput: z.boolean().describe("Show raw input of the transaction"),
+}, async (config) => {
+  console.log("Running command: ");
+  try {
+    const command= [
+      '/Users/flora/workspace/ai/mcp/sui-mcp/src/7kagCli.ts',
+      'placeLimitOrder',
+      '-n', `${config.dryRun}`,
+      '-p', `${config.pay}`,
+      '--payDecimals', `${config.payDecimals}`,
+      '-t', `${config.target}`,
+      '--targetDecimals', `${config.targetDecimals}`,
+      '-a', `${config.amount}`,
+      '-r', `${config.rate}`,
+      '-s', `${config.slippage}`,
+      '-e', `${config.expire}`,
+      '--expireDays', `${config.expireDays}`,
+      '--expireHours', `${config.expireHours}`,
+      '--expireMinutes', `${config.expireMinutes}`,
+      '--expireSeconds', `${config.expireSeconds}`,
+      '--dryRun', `${config.dryRun}`,
+      '--devInspect', `${config.devInspect}`,
+      '--showInput', `${config.showInput}`,
+      '--showEffects', `${config.showEffects}`,
+      '--showEvents', `${config.showEvents}`,
+      '--showObjectChanges', `${config.showObjectChanges}`,
+      '--showBalanceChanges', `${config.showBalanceChanges}`,
+      '--showRawEffects', `${config.showRawEffects}`,
+      '--showRawInput', `${config.showRawInput}`,
+    ];
+    console.log("Running command: ", command.join(" "));
+    // execute the command and return the result;
+    const {
+      stdout,
+      stderr,
+      status,
+        } = await spawnSync("/Users/flora/.bun/bin/bun", command);
+    const stdoutString = stdout.toString();
+    const stderrString = stderr.toString();
+    console.log("Command output: ", stdoutString);
+    console.log("Command error: ", stderrString);
+    console.log("Command exit code: ", status);
+    if (status !== 0) {
+      return {
+        content: [{
+          type: "text",
+          text: `Error: ${stderrString}`
+        }]
+      }
+    }
+    return {
+      content: [{
+        type: "text",
+        text: `Command output: ${stdoutString}`
+      }]
+    }
+  } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error: ${errorMessage}`
       }]
     };
   }

@@ -1,3 +1,5 @@
+#!/usr/bin/env -S bun
+
 // These two imports are necessary for the code to work, because the SDK has a dependency on them.
 // But they are not declared as dependencies in the package.json file.
 import "bignumber.js";
