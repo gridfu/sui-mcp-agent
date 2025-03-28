@@ -1,12 +1,11 @@
-#!/usr/bin/env -S bun
-
 // These two imports are necessary for the code to work, because the SDK has a dependency on them.
 // But they are not declared as dependencies in the package.json file.
 import "bignumber.js";
 import "bn.js";
 
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
-import { Transaction, ExecuteTransactionBlockParams } from '@mysten/sui/transactions';
+import { Transaction } from '@mysten/sui/transactions';
+import { ExecuteTransactionBlockParams } from '@mysten/sui/client';
 import sdk from "@7kprotocol/sdk-ts";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import process from "process";
@@ -72,7 +71,7 @@ async function placeLimitOrder(options: any) {
     const execOptions = getExecutionOptions(options);
 
     executeTransaction(keypair, tx, {
-        gasBudget: BigInt(options.gasBudget),
+        gasBudget: options.gasBudget ? BigInt(options.gasBudget) : undefined,
         dryRun: options.dryRun,
         execOptions,
     });
@@ -195,8 +194,6 @@ program
     .description('CLI to control limit orders with 7kag')
     .version('0.0.1');
 
-program
-
 program.command('listLimitOrders')
     .description('List open or closed limit orders')
     .option("-o, --open <true/false>", "List open orders", parseBool, true)
@@ -204,17 +201,17 @@ program.command('listLimitOrders')
     .option("-a, --account <account>", "The account address to list orders for")
     .option("--offset <offset>", "The offset for the list")
     .option("--limit <limit>", "The limit for the list")
-    .option("--tokenPair <tokenPair>", "The token pair to filter by", `${SUI_COIN_TYPE}-${USDC_COIN_TYPE}`)
+    .option("-t, --tokenPair <tokenPair>", "The token pair to filter by", `${SUI_COIN_TYPE}-${USDC_COIN_TYPE}`)
     .action(listLimitOrders);
 
 program.command('placeLimitOrder')
     .description('Place a limit order')
     .option("-n, --dryRun <true/false>", "Dry run the transaction", parseBool, true)
     .option("-p, --pay <pay>", "The coin type to pay with (e.g., USDC)", USDC_COIN_TYPE)
-    .option("--payDecimals", "The decimals of the coin to pay with")
-    .option("--gasBudget", "The gas budget for the transaction", 5000000)
+    .option("--payDecimals <decimals>", "The decimals of the coin to pay with")
+    .option("--gasBudget <budget>", "The gas budget for the transaction")
     .option("-t, --target <target>", "The coin type to receive (e.g., SUI)", SUI_COIN_TYPE)
-    .option("--targetDecimals", "The decimals of the coin to receive")
+    .option("--targetDecimals <decimals>", "The decimals of the coin to receive")
     .requiredOption("-a, --amount <amount>", "Amount to pay, scaled by the coin's decimals (e.g., 0.1 USDC = 100000 for 6 decimals)")
     // Say one USDC is worth 0.25 SUI. Then the rate is 0.25 * 10^(SUI_DECIMALS - USDC_DECIMALS) * 10^RATE_SCALE.
     // 0.25 * 10^(9 - 6) * 10^12 = 250000000000000. USDC decimals = 6, SUI decimals = 9, so rate scale = 12.
@@ -227,7 +224,7 @@ program.command('placeLimitOrder')
     .option("--expireSeconds <expireSeconds>", "Expiration in seconds")
     .option("-d, --devInspect <true/false>", "Set to true for development inspection mode", parseBool, true)
     .option("--showInput <true/false>", "Show input for the transaction", parseBool, true)
-    .option("--showEffects", "Show effects of the transaction", parseBool, true)
+    .option("--showEffects <true/false>", "Show effects of the transaction", parseBool, true)
     .option("--showEvents <true/false>", "Show events of the transaction", parseBool, true)
     .option("--showObjectChanges <true/false>", "Show object changes of the transaction", parseBool, true)
     .option("--showBalanceChanges <true/false>", "Show balance changes of the transaction", parseBool, true)
@@ -297,7 +294,6 @@ async function buildTransactionBytes(transaction: Transaction, signer?: Ed25519K
             transaction.setSenderIfNotSet(signer.toSuiAddress());
         }
         if (gasBudget) {
-            console.log("Setting gas budget", gasBudget);
             transaction.setGasBudget(gasBudget);
         }
         transactionBytes = await transaction.build({ client: suiClient });
@@ -314,11 +310,11 @@ async function executeTransaction(signer: Ed25519Keypair, tx: Transaction, extra
 }) {
     const { signature, bytes } = await signTransaction(tx, signer, extraOptions.gasBudget);
     if (extraOptions.dryRun) {
-        console.log("Dry running transaction", tx, bytes)
+        console.log("Dry running transaction", tx.toJSON(), bytes)
         const result = await suiClient.dryRunTransactionBlock({ transactionBlock: bytes });
         console.log("Transaction dry run result", result);
     } else {
-        console.log("Executing transaction", tx)
+        console.log("Executing transaction", tx.toJSON(), bytes)
         const result = await suiClient.executeTransactionBlock({
             transactionBlock: bytes,
             signature,
