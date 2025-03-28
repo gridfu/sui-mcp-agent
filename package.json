@@ -2,10 +2,11 @@
   "name": "sui-mcp",
   "version": "1.0.0",
   "description": "MCP server template for custom implementation",
-  "main": "src/server.ts",
+  "main": "src/index.ts",
   "scripts": {
-    "start": "ts-node src/server.ts",
-    "dev": "nodemon --exec ts-node src/server.ts",
+    "start": "tsx src/index.ts",
+    "start:inspector": "mcp-inspector tsx src/index.ts",
+    "dev": "nodemon --exec tsx src/index.ts",
     "build": "tsc && chmod 755 build/index.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --verbose",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
@@ -27,11 +28,12 @@
     "@types/chai": "^5.2.0",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
+    "@modelcontextprotocol/inspector": "0.7.0",
     "chai": "^4.3.10",
     "jest": "^29.5.0",
     "nodemon": "^3.0.0",
     "ts-jest": "^29.1.0",
-    "ts-node": "^10.9.1",
+    "tsx": "^4.19.3",
     "typescript": "^5.0.0"
   }
 }
