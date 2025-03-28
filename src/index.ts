@@ -331,6 +331,163 @@ server.tool("place-limit-order", "Place a limit order on 7kag protocol", {
   }
 });
 
+server.tool("cancel-limit-order", "Cancel a limit order on 7kag protocol", {
+  orderId: z.string().describe("The unique order ID (retrieved from getOpenLimitOrders)"),
+  pay: z.string().describe("The coin type used for payment (e.g., USDC)"),
+  target: z.string().describe("The target coin type (e.g., SUI)"),
+  dryRun: z.boolean().describe("Dry run the transaction"),
+}, async (config) => {
+  console.log("Running command: ");
+  try {
+    const command= [
+      '/Users/flora/workspace/ai/mcp/sui-mcp/src/7kagCli.ts',
+      'cancelLimitOrder',
+      '-i', `${config.orderId}`,
+      '-p', `${config.pay}`,
+      '-t', `${config.target}`,
+      '--dryRun', `${config.dryRun}`,
+    ]
+    console.log("Running command: ", command.join(" "));
+    // execute the command and return the result;
+    const {
+      stdout,
+      stderr,
+      status,
+        } = await spawnSync("/Users/flora/.bun/bin/bun", command);
+    const stdoutString = stdout.toString();
+    const stderrString = stderr.toString();
+    console.log("Command output: ", stdoutString);
+    console.log("Command error: ", stderrString);
+    console.log("Command exit code: ", status);
+    if (status!== 0) {
+      return {
+        content: [{
+          type: "text",
+          text: `Error: ${stderrString}`
+        }]
+      }
+    }
+    return {
+      content: [{
+        type: "text",
+        text: `Command output: ${stdoutString}`
+      }]
+    }
+   } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error: ${errorMessage}`
+      }]
+    };
+   }
+});
+
+server.tool("claim-expired-limit-order", "Claim assets from an expired limit order on 7kag protocol", {
+  orderId: z.string().describe("The unique order ID (retrieved from getOpenLimitOrders)"),
+  pay: z.string().describe("The coin type used for payment (e.g., USDC)"),
+  target: z.string().describe("The target coin type (e.g., SUI)"),
+  dryRun: z.boolean().describe("Dry run the transaction"),
+}, async (config) => {
+  console.log("Running command: ");
+  try {
+    const command= [
+      '/Users/flora/workspace/ai/mcp/sui-mcp/src/7kagCli.ts',
+      'claimExpiredLimitOrder',
+      '-i', `${config.orderId}`,
+      '-p', `${config.pay}`,
+      '-t', `${config.target}`,
+      '--dryRun', `${config.dryRun}`,
+    ]
+    console.log("Running command: ", command.join(" "));
+    // execute the command and return the result;
+    const {
+      stdout,
+      stderr,
+      status,
+        } = await spawnSync("/Users/flora/.bun/bin/bun", command);
+    const stdoutString = stdout.toString();
+    const stderrString = stderr.toString();
+    console.log("Command output: ", stdoutString);
+    console.log("Command error: ", stderrString);
+    console.log("Command exit code: ", status);
+    if (status!== 0) {
+      return {
+        content: [{
+          type: "text",
+          text: `Error: ${stderrString}`
+        }]
+      }
+    }
+    return {
+      content: [{
+        type: "text",
+        text: `Command output: ${stdoutString}`
+      }]
+    }
+  } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error: ${errorMessage}`
+      }]
+    };
+  }
+});
+
+server.tool("list-limit-orders", "List all limit orders on 7kag protocol", {
+  orderId: z.string().describe("The unique order ID (retrieved from getOpenLimitOrders)"),
+  dryRun: z.boolean().describe("Dry run the transaction"),
+  open: z.boolean().describe("List open limit orders"),
+  closed: z.boolean().describe("List closed limit orders"),
+}, async (config) => {
+  console.log("Running command: ");
+  try {
+    const command= [
+      '/Users/flora/workspace/ai/mcp/sui-mcp/src/7kagCli.ts',
+      'listLimitOrders',
+      '-o', `${config.open}`,
+      '-c', `${config.closed}`,
+    ]
+    console.log("Running command: ", command.join(" "));
+    // execute the command and return the result;
+    const {
+      stdout,
+      stderr,
+      status,
+        } = await spawnSync("/Users/flora/.bun/bin/bun", command);
+    const stdoutString = stdout.toString();
+    const stderrString = stderr.toString();
+    console.log("Command output: ", stdoutString);
+    console.log("Command error: ", stderrString);
+    console.log("Command exit code: ", status);
+    if (status!== 0) {
+      return {
+        content: [{
+          type: "text",
+          text: `Error: ${stderrString}`
+        }]
+      }
+    }
+    return {
+      content: [{
+        type: "text",
+        text: `Command output: ${stdoutString}`
+      }]
+    }
+  } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error: ${errorMessage}`
+      }]
+    };
+  }
+});
+
 server.tool("mock-price-change", "Simulate price changes, price changes can not more than grid span", {
   prices: z.array(z.number()).optional().describe("Array of price changes to simulate")
 }, async ({ prices }) => {
