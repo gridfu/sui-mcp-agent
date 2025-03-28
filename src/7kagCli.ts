@@ -44,7 +44,7 @@ function getExecutionOptions(options: any): ExecuteTransactionBlockOptions {
     };
 }
 
-export async function placeLimitOrder(options: any) {
+async function placeLimitOrder(options: any) {
     const keypair = getKeyPair();
     const sender = keypair.getPublicKey().toSuiAddress();
 
@@ -262,7 +262,7 @@ function getKeyPair() {
     return Ed25519Keypair.deriveKeypair(mnemonics, ED25519_DERIVATION_PATH);
 }
 
-export function getExpiryTimeMilliseconds(parameters: {
+function getExpiryTimeMilliseconds(parameters: {
     expire?: bigint,
     expireDays?: number,
     expireHours?: number,
