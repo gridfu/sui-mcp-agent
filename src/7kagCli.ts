@@ -298,12 +298,15 @@ async function buildTransactionBytes(transaction: Transaction, signer?: Ed25519K
         transactionBytes = transaction;
     } else {
         if (signer) {
+            console.log("Setting sender to", signer.toSuiAddress());
             transaction.setSenderIfNotSet(signer.toSuiAddress());
         }
         if (gasBudget) {
+            console.log("Setting gas budget to", gasBudget);
             transaction.setGasBudget(gasBudget);
         }
         transactionBytes = await transaction.build({ client: suiClient });
+        console.log("Built transaction", transactionBytes);
     }
     return transactionBytes;
 }
@@ -315,6 +318,7 @@ async function executeTransaction(signer: Ed25519Keypair, tx: Transaction, extra
     dryRun?: boolean,
     execOptions: ExecuteTransactionBlockOptions,
 }) {
+    console.log("Executing transaction", await tx.toJSON());
     const { signature, bytes } = await signTransaction(tx, signer, extraOptions.gasBudget);
     if (extraOptions.dryRun) {
         console.log("Dry running transaction", tx.toJSON(), bytes)

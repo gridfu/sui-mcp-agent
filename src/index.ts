@@ -252,7 +252,6 @@ server.tool("place-limit-order", "Place a limit order on 7kag protocol", {
   amount: z.string().describe("Amount to pay, scaled by the coin's decimals"),
   rate: z.string().describe("Exchange rate of 1 pay coin to target coin"),
   slippage: z.string().describe("Slippage tolerance, scaled by 10^4"),
-  expire: z.string().describe("Expiration timestamp in Unix format (milliseconds)"),
   expireDays: z.number().describe("Expiration in days"),
   expireHours: z.number().describe("Expiration in hours"),
   expireMinutes: z.number().describe("Expiration in minutes"),
@@ -280,7 +279,6 @@ server.tool("place-limit-order", "Place a limit order on 7kag protocol", {
       '-a', `${config.amount}`,
       '-r', `${config.rate}`,
       '-s', `${config.slippage}`,
-      '-e', `${config.expire}`,
       '--expireDays', `${config.expireDays}`,
       '--expireHours', `${config.expireHours}`,
       '--expireMinutes', `${config.expireMinutes}`,
@@ -294,6 +292,7 @@ server.tool("place-limit-order", "Place a limit order on 7kag protocol", {
       '--showBalanceChanges', `${config.showBalanceChanges}`,
       '--showRawEffects', `${config.showRawEffects}`,
       '--showRawInput', `${config.showRawInput}`,
+      '--gasBudget', `1000000`,
     ];
     console.log("Running command: ", command.join(" "));
     // execute the command and return the result;
