@@ -1,2 +1,8 @@
 node_modules/
 build/
+.env
+.env.test
+.env.production
+.env.development
+.env.local
+.env.staging

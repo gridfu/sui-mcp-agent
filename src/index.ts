@@ -6,7 +6,23 @@ import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { z } from "zod";
 import { GridTradingStrategy } from "./grid-trading.js";
+import { placeLimitOrder, getExpiryTimeMilliseconds } from "7kagCli.js";
 
+const USDC_COIN_TYPE = "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC";
+const USDC_ABBR = "USDC";
+const SUI_COIN_TYPE = "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
+const SUI_ABBR = "SUI";
+
+function getCoinType(coinType: string) {
+  switch (coinType.toUpperCase()) {
+    case USDC_ABBR:
+      return USDC_COIN_TYPE;
+    case SUI_ABBR:
+      return SUI_COIN_TYPE;
+    default:
+      return coinType;
+  }
+}
 
 // Create server instance
 export const server = new McpServer({
@@ -102,6 +118,58 @@ server.tool("transfer-sui", "Transfer SUI tokens to another address", {
       content: [{
         type: "text",
         text: `Error transferring SUI: ${errorMessage}`
+      }]
+    };
+  }
+});
+
+server.tool("place-limit-order", "Place a limit order for token exchange", {
+  pay: z.string().describe("The coin type to pay (e.g., 'SUI' or 'USDC')"),
+  payDecimals: z.number().optional().describe("The decimals of the coin to pay with"),
+  target: z.string().describe("The coin type to receive (e.g., 'USDC' or 'SUI')"),
+  targetDecimals: z.number().optional().describe("The decimals of the coin to receive"),
+  amount: z.number().positive().describe("Amount to pay, scaled by the coin's decimals"),
+  rate: z.number().positive().describe("Exchange rate of 1 pay coin to target coin"),
+  slippage: z.number().min(0).max(10000).default(100).describe("Slippage tolerance, scaled by 10^4"),
+  expire: z.number().optional().describe("Expiration timestamp in Unix format (milliseconds)"),
+  expireDays: z.number().optional().default(7).describe("Expiration in days"),
+  expireHours: z.number().optional().describe("Expiration in hours"),
+  expireMinutes: z.number().optional().describe("Expiration in minutes"),
+  expireSeconds: z.number().optional().describe("Expiration in seconds"),
+  gasBudget: z.string().optional().describe("The gas budget for the transaction"),
+  devInspect: z.boolean().default(true).describe("Set to true for development inspection mode"),
+  showInput: z.boolean().default(true).describe("Show input for the transaction"),
+  showEffects: z.boolean().default(true).describe("Show effects of the transaction"),
+  showEvents: z.boolean().default(true).describe("Show events of the transaction"),
+  showObjectChanges: z.boolean().default(true).describe("Show object changes of the transaction"),
+  showBalanceChanges: z.boolean().default(true).describe("Show balance changes of the transaction"),
+  showRawEffects: z.boolean().default(true).describe("Show raw effects of the transaction"),
+  showRawInput: z.boolean().default(true).describe("Show raw input of the transaction")
+}, async (params) => {
+  try {
+    await placeLimitOrder({
+      ...params,
+      pay: getCoinType(params.pay),
+      target: getCoinType(params.target),
+      amount: params.amount.toString(),
+      rate: params.rate.toString(),
+      slippage: params.slippage.toString(),
+      expiryTimeMilliseconds: params.expire ? BigInt(params.expire).toString() : getExpiryTimeMilliseconds(params as any).toString(),
+      dryRun: false
+    });
+
+    return {
+      content: [{
+        type: "text",
+        text: `Successfully placed limit order to exchange ${params.amount} ${params.pay} for ${params.target} at rate ${params.rate}`
+      }]
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error placing limit order: ${errorMessage}`
       }]
     };
   }
