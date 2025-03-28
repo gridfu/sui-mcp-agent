@@ -6,6 +6,7 @@ import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { z } from "zod";
 import { GridTradingStrategy } from "./grid-trading.js";
+import { placeLimitOrder } from "./7kagCli.js";
 
 const mainnetClient = new SuiClient({ url: getFullnodeUrl('mainnet') });
 const testnetClient = new SuiClient({ url: getFullnodeUrl('testnet') });
@@ -21,17 +22,17 @@ const FLASH_LENDER_OBJECT_ID = "0x2333464724684ef1da1662f3129cf5946c3885946d37f6
 const FLASH_LENDER_PACKAGE_ID = "0x4d8aaa6230fc2153ac7349299fa33f6c8ab3fa833dcd7c8fd62fb2f653ea3d5b";
 const SUI_TYPE = "0x2::sui::SUI";
 
-// server.tool("place-limit-order", "Place a limit order", {}, async (options) => {
-//   await placeLimitOrder(options);
-//   return {
-//     content: [
-//       {
-//         type: "text",
-//         text: `Placed limit order`
-//       }
-//     ]
-//   };
-// });
+server.tool("place-limit-order", "Place a limit order", {}, async (options) => {
+  await placeLimitOrder(options);
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Place a limit order`
+      }
+    ]
+  };
+});
 
 server.tool("generate-keypair", "Generate a new Sui keypair using Ed25519", {}, async () => {
   const keypair = new Ed25519Keypair();

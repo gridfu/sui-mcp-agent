@@ -44,7 +44,7 @@ function getExecutionOptions(options: any): ExecuteTransactionBlockOptions {
     };
 }
 
-async function placeLimitOrder(options: any) {
+export async function placeLimitOrder(options: any) {
     const keypair = getKeyPair();
     const sender = keypair.getPublicKey().toSuiAddress();
 
@@ -90,7 +90,7 @@ function getAccount(account?: string) {
     }
 }
 
-async function listLimitOrders(options: any) {
+export async function listLimitOrders(options: any) {
     const sender = getAccount(options.account);
 
     const listLimitOrdersInput = {
@@ -116,7 +116,7 @@ async function listLimitOrders(options: any) {
     }
 }
 
-async function cancelLimitOrder(options: any) {
+export async function cancelLimitOrder(options: any) {
     const keypair = getKeyPair();
     const sender = keypair.getPublicKey().toSuiAddress();
 
@@ -138,7 +138,7 @@ async function cancelLimitOrder(options: any) {
     });
 }
 
-async function claimExpiredLimitOrder(options: any) {
+export async function claimExpiredLimitOrder(options: any) {
     const keypair = getKeyPair();
     const sender = keypair.getPublicKey().toSuiAddress();
 
