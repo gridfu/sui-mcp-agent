@@ -19,6 +19,8 @@ const FLASH_LENDER_OBJECT_ID = "0x2333464724684ef1da1662f3129cf5946c3885946d37f6
 const FLASH_LENDER_PACKAGE_ID = "0x4d8aaa6230fc2153ac7349299fa33f6c8ab3fa833dcd7c8fd62fb2f653ea3d5b";
 const SUI_TYPE = "0x2::sui::SUI";
 
+let gridStrategy: GridTradingStrategy | null = null;
+
 server.tool("generate-keypair", "Generate a new Sui keypair using Ed25519", {}, async () => {
   const keypair = new Ed25519Keypair();
   const publicKey = keypair.getPublicKey();
@@ -121,8 +123,8 @@ server.tool("create-grid-strategy", "Create a new grid trading strategy", {
   quoteToken: z.string().describe("Quote token symbol")
 }, async (config) => {
   try {
-    const strategy = new GridTradingStrategy(config);
-    const gridLevels = strategy.getGridLevels();
+    gridStrategy = new GridTradingStrategy(config);
+    const gridLevels = gridStrategy.getGridLevels();
 
     return {
       content: [{
@@ -143,6 +145,89 @@ server.tool("create-grid-strategy", "Create a new grid trading strategy", {
   }
 });
 
+server.tool("get-grid-order-history", "Get all grid order list history", {
+}, async (config) => {
+  try {
+    if (!gridStrategy) throw new Error('Grid strategy not initialized');
+const history = gridStrategy.getTradeHistory();
+
+    return {
+      content: [{
+        type: "text",
+        // print order.type order.price order.gridIndex order.timestamp order.quantity
+        text: `Order history: ${history.map((order, index) =>
+          `${index + 1}. Type: ${order.type}\n   Price: ${order.price}\n   Grid Index: ${order.gridIndex}\n   Time: ${order.timestamp}\n   Quantity: ${order.quantity}\n`
+        ).join('')}`
+      }]
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error list orders: ${errorMessage}`
+      }]
+    };
+  }
+});
+
+server.tool("mock-price-change", "Simulate price changes, price changes can not more than grid span", {
+  prices: z.array(z.number()).optional().describe("Array of price changes to simulate")
+}, async ({ prices }) => {
+  if (!gridStrategy) {
+    throw new Error('Grid strategy not initialized');
+  }
+  const priceChanges = prices || [80000, 81000, 82000, 81000, 80000];
+  try {
+    const initialHistory = gridStrategy.getTradeHistory();
+    if (!gridStrategy) {
+  throw new Error('Grid strategy not initialized');
+}
+priceChanges.forEach(price => gridStrategy!.checkPriceMovement(price));
+    const updatedHistory = gridStrategy.getTradeHistory();
+    const pnl = gridStrategy.getCurrentProfitLoss(priceChanges[priceChanges.length - 1]);
+
+    return {
+      content: [{
+        type: "text",
+        text: `Price changes range: ${priceChanges.join(', ')}\nProfit and Loss: ${pnl}`
+      }]
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error mock price changes: ${errorMessage}`
+      }]
+    };
+  }
+});
+
+server.tool("get-profit-and-loss", "Get total profit and loss", {
+  price: z.number().positive().describe("The current price")
+}, async (price) => {
+  try {
+    if (!gridStrategy) throw new Error('Grid strategy not initialized');
+const pnl = gridStrategy.getCurrentProfitLoss(price.price);
+
+    return {
+      content: [{
+        type: "text",
+        text: `Profit and Loss: ${pnl}`
+      }]
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || 'An unknown error occurred';
+    return {
+      content: [{
+        type: "text",
+        text: `Error get profit and loss: ${errorMessage}`
+      }]
+    };
+  }
+});
+
 server.tool("deposit-to-flash-lender", "Deposit SUI to the flash lender pool", {
   amount: z.number().positive().describe("The amount of SUI to deposit"),
   privateKey: z.string().min(1).describe("The private key of the sender's account"),
@@ -152,16 +237,16 @@ server.tool("deposit-to-flash-lender", "Deposit SUI to the flash lender pool", {
     const client = network === 'mainnet' ? mainnetClient : testnetClient;
     const keypair = Ed25519Keypair.fromSecretKey(privateKey);
     const senderAddress = keypair.getPublicKey().toSuiAddress();
-    
+
     // Convert SUI to MIST (1 SUI = 10^9 MIST)
     const amountInMist = BigInt(Math.floor(amount * 1000000000));
-    
+
     // Create a transaction to deposit funds
     const tx = new Transaction();
-    
+
     // Split the coin from gas for deposit
     const [coinToDeposit] = tx.splitCoins(tx.gas, [amountInMist]);
-    
+
     // Call the deposit function on the flash lender
     tx.moveCall({
       target: `${FLASH_LENDER_PACKAGE_ID}::example::deposit`,
@@ -177,7 +262,7 @@ server.tool("deposit-to-flash-lender", "Deposit SUI to the flash lender pool", {
       signer: keypair,
       transaction: tx,
     });
-    
+
     await client.waitForTransaction({ digest: result.digest });
 
     return {
@@ -206,14 +291,14 @@ server.tool("withdraw-from-flash-lender", "Withdraw SUI from the flash lender po
     const client = network === 'mainnet' ? mainnetClient : testnetClient;
     const keypair = Ed25519Keypair.fromSecretKey(privateKey);
     const senderAddress = keypair.getPublicKey().toSuiAddress();
-    
+
     // Convert SUI to MIST
     const amountInMist = BigInt(Math.floor(amount * 1000000000));
-    
+
     // Create a transaction to withdraw funds
     const tx = new Transaction();
-    
-    // Call the withdraw_and_transfer function 
+
+    // Call the withdraw_and_transfer function
     tx.moveCall({
       target: `${FLASH_LENDER_PACKAGE_ID}::example::withdraw_and_transfer`,
       arguments: [
@@ -228,7 +313,7 @@ server.tool("withdraw-from-flash-lender", "Withdraw SUI from the flash lender po
       signer: keypair,
       transaction: tx,
     });
-    
+
     await client.waitForTransaction({ digest: result.digest });
 
     return {
@@ -257,13 +342,13 @@ server.tool("execute-flash-loan", "Execute a flash loan transaction", {
     const client = network === 'mainnet' ? mainnetClient : testnetClient;
     const keypair = Ed25519Keypair.fromSecretKey(privateKey);
     const borrowerAddress = keypair.getPublicKey().toSuiAddress();
-    
+
     // Convert SUI to MIST
     const amountInMist = BigInt(Math.floor(amount * 1000000000));
-    
+
     // Create a transaction for the flash loan
     const tx = new Transaction();
-    
+
     // 1. Call loan() function to borrow funds
     const [loanResult, receipt] = tx.moveCall({
       target: `${FLASH_LENDER_PACKAGE_ID}::example::loan`,
@@ -275,7 +360,7 @@ server.tool("execute-flash-loan", "Execute a flash loan transaction", {
     });
 
     // your own process for flash loan
-    
+
     // 2. Call repay() function to return the borrowed funds
     tx.moveCall({
       target: `${FLASH_LENDER_PACKAGE_ID}::example::repay`,
@@ -292,7 +377,7 @@ server.tool("execute-flash-loan", "Execute a flash loan transaction", {
       signer: keypair,
       transaction: tx,
     });
-    
+
     await client.waitForTransaction({ digest: result.digest });
 
     return {
